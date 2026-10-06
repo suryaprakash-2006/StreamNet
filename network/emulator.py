@@ -5,7 +5,7 @@ Provides high-precision simulation of:
   - Propagation delay (latency) using priority release queues with full pipelining
   - Delay variation (jitter) using Gaussian/Uniform noise
   - Packet loss using statistical Bernoulli and burst Markov drop models
-  - Bandwidth limitation using Token-Bucket traffic shaping
+  - Bandwidth limitation using Leaky/Token-Bucket bottleneck router queueing with configurable queue capacity and tail-drop
 """
 
 from collections import deque
@@ -36,12 +36,14 @@ class UDPEmulatorProxy:
         target_host: str = "127.0.0.1",
         target_port: int = 5002,
         condition: Optional[NetworkCondition] = None,
+        max_queue_delay_s: float = 1.0,  # Max bottleneck router queue buffer before tail-drop
     ):
         self.listen_host = listen_host
         self.listen_port = listen_port
         self.target_host = target_host
         self.target_port = target_port
         self.condition = condition or NetworkCondition()
+        self.max_queue_delay_s = max_queue_delay_s
 
         self.recv_sock: Optional[socket.socket] = None
         self.send_sock: Optional[socket.socket] = None
@@ -53,9 +55,8 @@ class UDPEmulatorProxy:
         self._queue_cond = threading.Condition(self._queue_lock)
         self._packet_counter = 0
 
-        # Token bucket state for bandwidth throttling
-        self._last_token_update = time.perf_counter()
-        self._tokens = 0.0
+        # Bottleneck router departure scheduler
+        self._last_depart_time = 0.0
 
         # Statistics
         self.packets_forwarded = 0
@@ -76,7 +77,7 @@ class UDPEmulatorProxy:
         self.send_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
         self.is_running = True
-        self._last_token_update = time.perf_counter()
+        self._last_depart_time = time.perf_counter()
 
         self._recv_thread = threading.Thread(target=self._receive_loop, daemon=True)
         self._dispatch_thread = threading.Thread(target=self._dispatch_loop, daemon=True)
@@ -111,7 +112,7 @@ class UDPEmulatorProxy:
             except (socket.error, OSError):
                 break
 
-            # 1. Packet Loss Decision
+            # 1. Packet Loss Decision (Statistical Channel Loss)
             if self.condition.loss_percent > 0:
                 roll = random.uniform(0.0, 100.0)
                 if roll < self.condition.loss_percent:
@@ -120,22 +121,26 @@ class UDPEmulatorProxy:
                                  len(data), roll, self.condition.loss_percent)
                     continue
 
-            # 2. Bandwidth Throttling (Token Bucket delay)
+            # 2. Bandwidth Bottleneck & Transmission Delay Calculation
             now = time.perf_counter()
-            tx_delay = 0.0
+            packet_len = len(data)
+
             if self.condition.bandwidth_mbps and self.condition.bandwidth_mbps > 0:
                 bytes_per_sec = (self.condition.bandwidth_mbps * 1_000_000.0) / 8.0
-                elapsed = now - self._last_token_update
-                self._tokens = min(bytes_per_sec, self._tokens + elapsed * bytes_per_sec)
-                self._last_token_update = now
+                tx_duration = packet_len / bytes_per_sec
+                depart_time = max(now, self._last_depart_time) + tx_duration
 
-                packet_size = len(data)
-                if self._tokens < packet_size:
-                    deficit = packet_size - self._tokens
-                    tx_delay = deficit / bytes_per_sec
-                    self._tokens = 0.0
-                else:
-                    self._tokens -= packet_size
+                # Check bottleneck queue buffer overflow (Tail Drop)
+                queueing_delay = depart_time - now
+                if queueing_delay > self.max_queue_delay_s:
+                    self.packets_dropped += 1
+                    logger.debug("Tail-drop: router buffer overflow (delay %.2fs > %.2fs)",
+                                 queueing_delay, self.max_queue_delay_s)
+                    continue
+
+                self._last_depart_time = depart_time
+            else:
+                depart_time = now
 
             # 3. Latency & Jitter Computation
             base_delay_s = self.condition.latency_ms / 1000.0
@@ -143,8 +148,8 @@ class UDPEmulatorProxy:
             if self.condition.jitter_ms > 0:
                 jitter_s = random.gauss(0, self.condition.jitter_ms / 1000.0)
 
-            total_delay = max(0.0, base_delay_s + jitter_s + tx_delay)
-            target_release_time = now + total_delay
+            total_delay = max(0.0, base_delay_s + jitter_s)
+            target_release_time = depart_time + total_delay
 
             with self._queue_cond:
                 self._packet_counter += 1
@@ -308,17 +313,14 @@ class TCPEmulatorProxy:
     def _forward_stream_pipelined(self, src_sock: socket.socket, dst_sock: socket.socket) -> None:
         """
         Forward byte stream with strictly in-order FIFO pipelined scheduling,
-        latency injection, and token-bucket bandwidth limiting.
+        latency injection, and bottleneck transmission delay.
         """
-        # FIFO queue of tuples: (release_timestamp_mono, chunk_bytes)
         fifo_queue: Deque[Tuple[float, bytes]] = deque()
         queue_lock = threading.Lock()
         queue_cond = threading.Condition(queue_lock)
         read_active = True
 
-        last_token_update = time.perf_counter()
-        tokens = 0.0
-        last_scheduled_release_time = 0.0
+        last_depart_time = 0.0
 
         def dispatcher():
             nonlocal fifo_queue
@@ -357,29 +359,20 @@ class TCPEmulatorProxy:
                     break
 
                 now = time.perf_counter()
-                tx_delay = 0.0
+                chunk_len = len(data)
 
-                # Token Bucket Bandwidth Rate Limiter
+                # Bandwidth transmission departure calculation
                 if self.condition.bandwidth_mbps and self.condition.bandwidth_mbps > 0:
                     bytes_per_sec = (self.condition.bandwidth_mbps * 1_000_000.0) / 8.0
-                    elapsed = now - last_token_update
-                    tokens = min(bytes_per_sec, tokens + elapsed * bytes_per_sec)
-                    last_token_update = now
-
-                    data_len = len(data)
-                    if tokens < data_len:
-                        deficit = data_len - tokens
-                        tx_delay = deficit / bytes_per_sec
-                        tokens = 0.0
-                    else:
-                        tokens -= data_len
+                    tx_duration = chunk_len / bytes_per_sec
+                    depart_time = max(now, last_depart_time) + tx_duration
+                    last_depart_time = depart_time
+                else:
+                    depart_time = now
 
                 # Base propagation delay
                 base_delay_s = self.condition.latency_ms / 1000.0
-
-                # Ensure strict monotonic FIFO ordering across TCP stream chunks
-                scheduled_time = max(now + base_delay_s + tx_delay, last_scheduled_release_time + tx_delay)
-                last_scheduled_release_time = scheduled_time
+                scheduled_time = depart_time + base_delay_s
 
                 with queue_cond:
                     fifo_queue.append((scheduled_time, data))
