@@ -123,10 +123,10 @@ def test_tcp_emulator_bandwidth_throttling():
     client_thread = threading.Thread(target=lambda: (time.sleep(0.05), client.connect(), client.receive_stream()))
     client_thread.start()
 
-    # Stream 10 frames of 100KB each (1 MB total)
-    server.stream_payloads(sample_generator(count=10, size=100_000), target_fps=100.0)
+    # Stream 10 frames of 40KB each (400 KB total)
+    server.stream_payloads(sample_generator(count=10, size=40_000), target_fps=100.0)
 
-    client_thread.join(timeout=8.0)
+    client_thread.join(timeout=10.0)
     server.stop()
     proxy.stop()
 

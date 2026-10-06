@@ -2,19 +2,20 @@
 StreamNet Socket-Level Network Impairment Proxy and Channel Emulator.
 
 Provides high-precision simulation of:
-  - Propagation delay (latency) using priority release queues
+  - Propagation delay (latency) using priority release queues with full pipelining
   - Delay variation (jitter) using Gaussian/Uniform noise
   - Packet loss using statistical Bernoulli and burst Markov drop models
   - Bandwidth limitation using Token-Bucket traffic shaping
 """
 
+from collections import deque
 import heapq
 import logging
 import random
 import socket
 import threading
 import time
-from typing import List, Optional, Tuple
+from typing import Deque, List, Optional, Tuple
 
 from network.conditions import NetworkCondition
 
@@ -212,7 +213,7 @@ class TCPEmulatorProxy:
     """
     Socket-level TCP Network Impairment Proxy.
     Accepts client connection, bridges to upstream TCP server, and applies
-    traffic shaping (bandwidth throttling, delay/latency injection, and buffer stalls).
+    pipelined traffic shaping (bandwidth throttling, delay/latency injection, and FIFO queue preservation).
     """
 
     def __init__(
@@ -286,36 +287,81 @@ class TCPEmulatorProxy:
                 continue
 
             # Bidirectional forwarding threads
-            t1 = threading.Thread(target=self._forward_stream, args=(upstream_sock, client_sock, "Server->Client"), daemon=True)
-            t2 = threading.Thread(target=self._forward_stream, args=(client_sock, upstream_sock, "Client->Server"), daemon=True)
+            t1 = threading.Thread(target=self._forward_stream_pipelined, args=(upstream_sock, client_sock), daemon=True)
+            t2 = threading.Thread(target=self._forward_stream_direct, args=(client_sock, upstream_sock), daemon=True)
             t1.start()
             t2.start()
             t1.join()
             t2.join()
 
-    def _forward_stream(self, src_sock: socket.socket, dst_sock: socket.socket, direction: str) -> None:
-        """Forward byte stream applying delay and bandwidth shaping."""
-        chunk_size = 4096
+    def _forward_stream_direct(self, src_sock: socket.socket, dst_sock: socket.socket) -> None:
+        """Direct reverse forwarding for control/client messages."""
+        try:
+            while self.is_running:
+                data = src_sock.recv(4096)
+                if not data:
+                    break
+                dst_sock.sendall(data)
+        except Exception:
+            pass
+
+    def _forward_stream_pipelined(self, src_sock: socket.socket, dst_sock: socket.socket) -> None:
+        """
+        Forward byte stream with strictly in-order FIFO pipelined scheduling,
+        latency injection, and token-bucket bandwidth limiting.
+        """
+        # FIFO queue of tuples: (release_timestamp_mono, chunk_bytes)
+        fifo_queue: Deque[Tuple[float, bytes]] = deque()
+        queue_lock = threading.Lock()
+        queue_cond = threading.Condition(queue_lock)
+        read_active = True
+
         last_token_update = time.perf_counter()
         tokens = 0.0
+        last_scheduled_release_time = 0.0
 
+        def dispatcher():
+            nonlocal fifo_queue
+            while self.is_running:
+                with queue_cond:
+                    while self.is_running and not fifo_queue and read_active:
+                        queue_cond.wait(timeout=0.01)
+
+                    if not fifo_queue and not read_active:
+                        break
+                    if not self.is_running:
+                        break
+
+                    now = time.perf_counter()
+                    rel_time, chunk = fifo_queue[0]
+                    if now < rel_time:
+                        queue_cond.wait(timeout=min(rel_time - now, 0.005))
+                        continue
+
+                    fifo_queue.popleft()
+
+                try:
+                    dst_sock.sendall(chunk)
+                    self.bytes_forwarded += len(chunk)
+                except Exception:
+                    break
+
+        dispatch_thread = threading.Thread(target=dispatcher, daemon=True)
+        dispatch_thread.start()
+
+        chunk_size = 4096
         try:
             while self.is_running:
                 data = src_sock.recv(chunk_size)
                 if not data:
                     break
 
-                # Apply Latency / Jitter delay
-                base_delay_s = self.condition.latency_ms / 1000.0
-                jitter_s = 0.0
-                if self.condition.jitter_ms > 0:
-                    jitter_s = random.gauss(0, self.condition.jitter_ms / 1000.0)
-                total_delay = max(0.0, base_delay_s + jitter_s)
+                now = time.perf_counter()
+                tx_delay = 0.0
 
-                # Bandwidth rate limiting
+                # Token Bucket Bandwidth Rate Limiter
                 if self.condition.bandwidth_mbps and self.condition.bandwidth_mbps > 0:
                     bytes_per_sec = (self.condition.bandwidth_mbps * 1_000_000.0) / 8.0
-                    now = time.perf_counter()
                     elapsed = now - last_token_update
                     tokens = min(bytes_per_sec, tokens + elapsed * bytes_per_sec)
                     last_token_update = now
@@ -325,19 +371,27 @@ class TCPEmulatorProxy:
                         deficit = data_len - tokens
                         tx_delay = deficit / bytes_per_sec
                         tokens = 0.0
-                        total_delay += tx_delay
                     else:
                         tokens -= data_len
 
-                if total_delay > 0:
-                    time.sleep(total_delay)
+                # Base propagation delay
+                base_delay_s = self.condition.latency_ms / 1000.0
 
-                dst_sock.sendall(data)
-                self.bytes_forwarded += len(data)
+                # Ensure strict monotonic FIFO ordering across TCP stream chunks
+                scheduled_time = max(now + base_delay_s + tx_delay, last_scheduled_release_time + tx_delay)
+                last_scheduled_release_time = scheduled_time
 
-        except (socket.error, ConnectionResetError, BrokenPipeError):
+                with queue_cond:
+                    fifo_queue.append((scheduled_time, data))
+                    queue_cond.notify()
+
+        except Exception:
             pass
         finally:
+            read_active = False
+            with queue_cond:
+                queue_cond.notify_all()
+            dispatch_thread.join(timeout=10.0)
             try:
                 src_sock.close()
             except Exception:
