@@ -1,0 +1,9 @@
+scenario_id,scenario_name,protocol,throughput_mean,throughput_std,throughput_min,throughput_max,goodput_mean,goodput_std,latency_mean,latency_std,latency_min,latency_max,fdr_mean,fdr_std,loss_rate_mean,loss_rate_std,stall_seconds_mean,stall_seconds_std
+AUDIT_1_BASELINE,Baseline (Ideal),TCP,4.731,0.06,4.677,4.814,4.726,0.06,0.35,0.182,0.215,0.608,100.0,0.0,0.0,0.0,1.245,0.091
+AUDIT_1_BASELINE,Baseline (Ideal),UDP,4.858,0.054,4.789,4.92,4.745,0.052,1.327,0.092,1.242,1.455,100.0,0.0,0.0,0.0,1.406,0.064
+AUDIT_2_LATENCY_100MS,100ms Latency,TCP,4.627,0.027,4.593,4.659,4.623,0.027,108.576,0.178,108.392,108.817,96.3,1.05,0.0,0.0,1.198,0.107
+AUDIT_2_LATENCY_100MS,100ms Latency,UDP,4.615,0.027,4.583,4.648,4.508,0.026,109.148,0.289,108.86,109.543,96.3,1.05,0.0,0.0,1.219,0.088
+AUDIT_3_LOSS_5PCT,5% Packet Loss,TCP,4.811,0.103,4.723,4.955,4.806,0.102,17.917,0.421,17.328,18.289,100.0,0.0,0.0,0.0,1.234,0.191
+AUDIT_3_LOSS_5PCT,5% Packet Loss,UDP,4.496,0.062,4.422,4.574,4.392,0.061,19.796,0.138,19.606,19.926,37.78,9.07,5.27,0.81,1.338,0.063
+AUDIT_4_BW_1MBPS,1.0 Mbps Bandwidth,TCP,0.997,0.0,0.996,0.998,0.996,0.0,3377.471,86.227,3255.664,3443.361,22.96,4.19,0.0,0.0,8.041,0.015
+AUDIT_4_BW_1MBPS,1.0 Mbps Bandwidth,UDP,0.973,0.002,0.971,0.976,0.949,0.002,805.303,0.323,804.987,805.746,13.33,0.0,67.28,0.1,2.047,0.026

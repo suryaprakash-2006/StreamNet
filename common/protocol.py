@@ -31,6 +31,8 @@ class MsgType(enum.IntEnum):
     STREAM_END = 4      # End of stream indication
     PING = 5            # Latency / RTT probe
     PONG = 6            # Latency / RTT response
+    AUDIO_FRAME = 7     # Full audio frame / PCM buffer
+    AUDIO_CHUNK = 8     # Fragmented audio chunk
 
 
 class HeaderFlags(enum.IntFlag):

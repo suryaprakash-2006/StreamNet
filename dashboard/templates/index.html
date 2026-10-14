@@ -1,0 +1,3050 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StreamNet Media Hub & Evaluation Lab | Transport Protocol Observability</title>
+  <!-- Synchronous Theme Initialization to prevent flash of unstyled content (FOUC) -->
+  <script>
+    (function() {
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlTheme = urlParams.get('theme');
+        if (urlTheme && ['dark', 'light', 'system'].includes(urlTheme)) {
+          localStorage.setItem('streamnet_theme', urlTheme);
+        }
+        const pref = localStorage.getItem('streamnet_theme') || 'system';
+        const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const isDark = pref === 'dark' || (pref === 'system' && systemDark);
+        if (isDark) {
+          document.documentElement.classList.add('dark');
+          document.documentElement.classList.remove('light');
+        } else {
+          document.documentElement.classList.add('light');
+          document.documentElement.classList.remove('dark');
+        }
+      } catch (e) {
+        document.documentElement.classList.add('dark');
+      }
+    })();
+  </script>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              tcp: '#3B82F6',
+              udp: '#EF4444',
+              accent: '#06B6D4',
+              dark: '#0B0F17',
+              surface: '#111827',
+              card: '#161F30',
+              border: '#1F2D44',
+              lightBg: '#F8FAFC',
+              lightCard: '#FFFFFF',
+              lightBorder: '#E2E8F0'
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+            mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace']
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* ========================================================================= */
+    /* GLOBAL THEME ENGINE: DRIBBLE WARM CREAM & DARK OBSERVABILITY PALETTES    */
+    /* ========================================================================= */
+    :root, html.light {
+      --theme-bg-base: #F6EFD9;
+      --theme-bg-shell: #FAF5E8;
+      --theme-bg-sidebar: #F2E8CD;
+      --theme-bg-card: #FFFFFF;
+      --theme-bg-card-subtle: #FAF4E6;
+      --theme-bg-card-hover: #F5EEDB;
+      --theme-bg-input: #FFFFFF;
+      --theme-border: #E2D9C5;
+      --theme-border-subtle: #EFE6D2;
+      --theme-border-strong: #CAAD91;
+      --theme-text-primary: #16110D;
+      --theme-text-secondary: #483F34;
+      --theme-text-muted: #726553;
+      --theme-text-faint: #9C8E7D;
+      --theme-accent-gold: #EADEAC;
+      --theme-accent-olive: #A89A5D;
+      --theme-accent-cognac: #966837;
+      --theme-accent-sand: #CAAD91;
+      --theme-table-head: #EDE4CB;
+      --theme-shadow: 0 2px 8px -2px rgba(72, 63, 52, 0.08), 0 1px 3px 0 rgba(72, 63, 52, 0.04);
+      --theme-plot-surface: #FFFFFF;
+      color-scheme: light;
+    }
+
+    html.dark {
+      --theme-bg-base: #0B0F17;
+      --theme-bg-shell: #090D14;
+      --theme-bg-sidebar: #090D14;
+      --theme-bg-card: #111827;
+      --theme-bg-card-subtle: #0E1624;
+      --theme-bg-card-hover: #162132;
+      --theme-bg-input: #0B0F17;
+      --theme-border: #1E2D44;
+      --theme-border-subtle: #162132;
+      --theme-border-strong: #2A3C5A;
+      --theme-text-primary: #F8FAFC;
+      --theme-text-secondary: #CBD5E1;
+      --theme-text-muted: #94A3B8;
+      --theme-text-faint: #64748B;
+      --theme-table-head: #0B0F17;
+      --theme-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
+      --theme-plot-surface: #F8FAFC;
+      color-scheme: dark;
+    }
+
+    body {
+      background-color: var(--theme-bg-base) !important;
+      color: var(--theme-text-primary) !important;
+      transition: background-color 0.2s ease, color 0.2s ease;
+    }
+
+    #mainShell {
+      background-color: var(--theme-bg-base) !important;
+      transition: background-color 0.2s ease;
+    }
+
+    /* ------------------------------------------------------------- */
+    /* SIDEBAR & NAVIGATION ADAPTATION                               */
+    /* ------------------------------------------------------------- */
+    #appSidebar {
+      background-color: var(--theme-bg-sidebar) !important;
+      border-right-color: var(--theme-border) !important;
+      transition: background-color 0.2s ease, border-color 0.2s ease;
+    }
+
+    html.light #appSidebar .border-b,
+    html.light #appSidebar .border-t {
+      border-color: var(--theme-border) !important;
+    }
+
+    html.light #appSidebar .bg-gradient-to-tr {
+      background: linear-gradient(135deg, #16110D 0%, #483F34 100%) !important;
+      color: #F6EFD9 !important;
+      border: 1px solid #CAAD91 !important;
+      box-shadow: 0 2px 6px rgba(22, 17, 13, 0.15) !important;
+    }
+
+    html.light #appSidebar span.text-white {
+      color: #16110D !important;
+    }
+
+    html.light #appSidebar .text-cyan-300 {
+      background-color: #EADEAC !important;
+      color: #16110D !important;
+      border-color: #CAAD91 !important;
+    }
+
+    html.light #appSidebar .text-slate-400 {
+      color: #726553 !important;
+    }
+
+    html.light #appSidebar .bg-cyan-400,
+    html.light #appSidebar .bg-indigo-400 {
+      background-color: #A89A5D !important;
+    }
+
+    html.light #sidebarNavMenu button {
+      color: #483F34 !important;
+    }
+
+    html.light #sidebarNavMenu button:hover:not(.nav-tab-active) {
+      background-color: #EDE2C6 !important;
+      color: #16110D !important;
+    }
+
+    html.light #sidebarNavMenu button i {
+      color: #966837 !important;
+    }
+
+    html.light .nav-tab-active {
+      background-color: #EADEAC !important;
+      color: #16110D !important;
+      border: 1px solid #CAAD91 !important;
+      font-weight: 700 !important;
+      box-shadow: 0 1px 3px rgba(72, 63, 52, 0.08) !important;
+    }
+
+    html.light .nav-tab-active i {
+      color: #966837 !important;
+    }
+
+    html.light #appSidebar .bg-\[\#111927\],
+    html.light #appSidebar .bg-\[\#0F1622\] {
+      background-color: #FFFFFF !important;
+      border-color: var(--theme-border) !important;
+    }
+
+    html.light #sidebarStatusText {
+      color: #16110D !important;
+    }
+
+    html.light #sidebarLanIp {
+      color: #966837 !important;
+    }
+
+    html.light #sidebarProtocolBadge {
+      color: #1D4ED8 !important;
+    }
+
+    /* ------------------------------------------------------------- */
+    /* TOP APP BAR & HEADER                                          */
+    /* ------------------------------------------------------------- */
+    #topAppBar {
+      background-color: var(--theme-bg-shell) !important;
+      border-bottom-color: var(--theme-border) !important;
+      transition: background-color 0.2s ease, border-color 0.2s ease;
+    }
+
+    html.light #pageTitle {
+      color: #16110D !important;
+    }
+
+    html.light #themeContextBadge {
+      background-color: #EADEAC !important;
+      color: #16110D !important;
+      border-color: #CAAD91 !important;
+    }
+
+    html.light #themeSelectorContainer {
+      background-color: #EADEAC !important;
+      border-color: #CAAD91 !important;
+    }
+
+    html.light #topAppBar button.bg-\[\#141C2B\] {
+      background-color: #FFFFFF !important;
+      border-color: var(--theme-border) !important;
+      color: #16110D !important;
+    }
+
+    html.light #topAppBar button.bg-\[\#141C2B\]:hover {
+      background-color: #FAF4E6 !important;
+    }
+
+    /* ------------------------------------------------------------- */
+    /* CARD SURFACES & CONTAINERS ACROSS PAGES                       */
+    /* ------------------------------------------------------------- */
+    html.light .bg-\[\#111827\],
+    html.light .bg-\[\#111927\],
+    html.light .bg-\[\#141C2B\],
+    html.light .bg-\[\#161F30\],
+    html.light .bg-\[\#162032\],
+    html.light .bg-\[\#0F1622\] {
+      background-color: var(--theme-bg-card) !important;
+    }
+
+    html.light .border-\[\#1B2537\],
+    html.light .border-\[\#1E2D44\],
+    html.light .border-\[\#212E44\],
+    html.light .border-\[\#23334E\],
+    html.light .border-\[\#182335\],
+    html.light .border-\[\#1F2D44\] {
+      border-color: var(--theme-border) !important;
+    }
+
+    /* Dark Mode Overrides for Light-Tagged Elements */
+    html.dark .bg-white {
+      background-color: var(--theme-bg-card) !important;
+    }
+    html.dark .border-slate-200,
+    html.dark .border-slate-200\/80,
+    html.dark .border-slate-200\/90 {
+      border-color: var(--theme-border) !important;
+    }
+    html.dark .bg-\[\#F8FAFC\] {
+      background-color: var(--theme-bg-base) !important;
+    }
+    html.dark .bg-slate-50 {
+      background-color: var(--theme-bg-card-subtle) !important;
+    }
+
+    /* ------------------------------------------------------------- */
+    /* TYPOGRAPHY IN LIGHT & DARK MODES                              */
+    /* ------------------------------------------------------------- */
+    html.light h1.text-white,
+    html.light h2.text-white,
+    html.light h3.text-white,
+    html.light h4.text-white,
+    html.light h5.text-white,
+    html.light p.text-white,
+    html.light label.text-slate-300,
+    html.light .text-slate-200:not([class*="badge"]):not([class*="bg-"]) {
+      color: var(--theme-text-primary) !important;
+    }
+
+    html.light .text-slate-300:not([class*="badge"]):not([class*="bg-"]) {
+      color: var(--theme-text-secondary) !important;
+    }
+
+    html.light .text-slate-400 {
+      color: var(--theme-text-muted) !important;
+    }
+
+    html.light .text-slate-500 {
+      color: var(--theme-text-faint) !important;
+    }
+
+    html.dark .text-slate-900,
+    html.dark .text-slate-800 {
+      color: var(--theme-text-primary) !important;
+    }
+    html.dark .text-slate-700,
+    html.dark .text-slate-600 {
+      color: var(--theme-text-secondary) !important;
+    }
+    html.dark .text-slate-500 {
+      color: var(--theme-text-muted) !important;
+    }
+
+    /* ------------------------------------------------------------- */
+    /* FORM CONTROLS & RANGE SLIDERS                                */
+    /* ------------------------------------------------------------- */
+    html.light select,
+    html.light input[type="text"],
+    html.light input[type="search"] {
+      background-color: var(--theme-bg-input) !important;
+      border: 1px solid #D5C8B2 !important;
+      color: var(--theme-text-primary) !important;
+      box-shadow: 0 1px 2px rgba(22, 17, 13, 0.04);
+    }
+    html.light select:focus,
+    html.light input[type="text"]:focus,
+    html.light input[type="search"]:focus {
+      border-color: var(--theme-accent-olive) !important;
+      outline: none;
+      box-shadow: 0 0 0 2px rgba(168, 154, 93, 0.25) !important;
+    }
+
+    html.dark select,
+    html.dark input[type="text"],
+    html.dark input[type="search"] {
+      background-color: var(--theme-bg-input) !important;
+      border-color: var(--theme-border) !important;
+      color: var(--theme-text-primary) !important;
+    }
+
+    html.light input[type="range"] {
+      background-color: #EADEAC !important;
+    }
+    html.light input[type="range"]::-webkit-slider-thumb {
+      background-color: #966837 !important;
+    }
+    html.light .bg-\[\#162032\]\/60 {
+      background-color: #FAF5E8 !important;
+      border: 1px solid var(--theme-border) !important;
+    }
+    html.light #labLatencyVal,
+    html.light #labJitterVal {
+      color: #966837 !important;
+    }
+    html.light #labLossVal {
+      color: #B91C1C !important;
+    }
+    html.light #labBwVal {
+      color: #3F6212 !important;
+    }
+
+    /* ------------------------------------------------------------- */
+    /* SECTION 0: SYSTEM OVERVIEW                                    */
+    /* ------------------------------------------------------------- */
+    html.light #sectionOverview > div:first-child {
+      background: linear-gradient(135deg, #FAF4E6 0%, #F5EEDB 50%, #EFE5CD 100%) !important;
+      border: 1px solid #DFD3BA !important;
+      box-shadow: 0 4px 14px -3px rgba(72, 63, 52, 0.08) !important;
+    }
+    html.light #sectionOverview > div:first-child h2 {
+      color: #16110D !important;
+    }
+    html.light #sectionOverview > div:first-child p {
+      color: #483F34 !important;
+    }
+    html.light #sectionOverview > div:first-child span.bg-cyan-500\/20 {
+      background-color: #EADEAC !important;
+      color: #16110D !important;
+      border-color: #CAAD91 !important;
+    }
+    html.light #sectionOverview .md\:grid-cols-3 > div {
+      background-color: #FFFFFF !important;
+      border-color: var(--theme-border) !important;
+    }
+    html.light #sectionOverview .md\:grid-cols-3 > div:hover {
+      border-color: var(--theme-border-strong) !important;
+      box-shadow: 0 4px 14px -2px rgba(72, 63, 52, 0.08) !important;
+    }
+    html.light #sectionOverview .md\:grid-cols-3 > div .w-10 {
+      background-color: #FAF4E6 !important;
+      border: 1px solid #EADEAC !important;
+      color: #966837 !important;
+    }
+    html.light #sectionOverview .md\:grid-cols-3 > div h3 {
+      color: #16110D !important;
+    }
+    html.light #sectionOverview .md\:grid-cols-3 > div p {
+      color: #483F34 !important;
+    }
+    html.light #sectionOverview .md\:grid-cols-3 > div div.pt-4 {
+      color: #966837 !important;
+    }
+
+    /* ------------------------------------------------------------- */
+    /* SECTION 1: EXPERIMENT LAB CONTROLS                            */
+    /* ------------------------------------------------------------- */
+    html.light #sectionExperiment > div:first-child {
+      background: linear-gradient(135deg, #FAF4E6 0%, #F5EEDB 100%) !important;
+      border: 1px solid #DFD3BA !important;
+    }
+    html.light #sectionExperiment > div:first-child h2 {
+      color: #16110D !important;
+    }
+    html.light #sectionExperiment > div:first-child p {
+      color: #483F34 !important;
+    }
+    html.light #sectionExperiment > div:first-child span.bg-cyan-500\/20 {
+      background-color: #EADEAC !important;
+      color: #16110D !important;
+      border-color: #CAAD91 !important;
+    }
+    html.light #audioStatusBadge {
+      background-color: #FAF4E6 !important;
+      border-color: var(--theme-border) !important;
+      color: #483F34 !important;
+    }
+    html.light #protoBtnTCP.border-2 {
+      background-color: #EFF6FF !important;
+      border-color: #2563EB !important;
+      color: #1D4ED8 !important;
+    }
+    html.light #protoBtnUDP.border-2 {
+      background-color: #FEF2F2 !important;
+      border-color: #DC2626 !important;
+      color: #B91C1C !important;
+    }
+    html.light #protoBtnTCP:not(.border-2),
+    html.light #protoBtnUDP:not(.border-2) {
+      background-color: #FAF5E8 !important;
+      border-color: var(--theme-border) !important;
+      color: #726553 !important;
+    }
+    html.light #mediaModeVideo.border-2,
+    html.light #mediaModeAudio.border-2,
+    html.light #mediaModeAV.border-2 {
+      background-color: #EADEAC !important;
+      border-color: #966837 !important;
+      color: #16110D !important;
+    }
+    html.light #mediaModeVideo:not(.border-2),
+    html.light #mediaModeAudio:not(.border-2),
+    html.light #mediaModeAV:not(.border-2) {
+      background-color: #FFFFFF !important;
+      border-color: var(--theme-border) !important;
+      color: #483F34 !important;
+    }
+    html.light #audioConfigPanel {
+      background-color: #FAF4E6 !important;
+      border-color: #EADEAC !important;
+    }
+    html.light #startStreamBtn {
+      background: linear-gradient(135deg, #3F6212 0%, #5B7042 100%) !important;
+      color: #FFFFFF !important;
+      box-shadow: 0 4px 10px rgba(63, 98, 18, 0.25) !important;
+    }
+    html.light #stopStreamBtn {
+      background-color: #FEE2E2 !important;
+      border-color: #FCA5A5 !important;
+      color: #991B1B !important;
+    }
+
+    /* ------------------------------------------------------------- */
+    /* SECTION 2: LIVE MONITOR & TELEMETRY KPIS                      */
+    /* ------------------------------------------------------------- */
+    html.light #playerProtoBadge {
+      background-color: #EFF6FF !important;
+      color: #1D4ED8 !important;
+      border-color: #BFDBFE !important;
+    }
+    html.light #liveFpsVal {
+      color: #0F766E !important;
+    }
+    html.light #kpiThroughput,
+    html.light #kpiLatency {
+      color: #16110D !important;
+    }
+    html.light #kpiGoodput {
+      color: #0F766E !important;
+    }
+    html.light #kpiJitter,
+    html.light #kpiStalls {
+      color: #966837 !important;
+    }
+    html.light #kpiFdr {
+      color: #3F6212 !important;
+    }
+    html.light #kpiLoss {
+      color: #B91C1C !important;
+    }
+    html.light #liveChartScrollWrapper {
+      background-color: #FAF5E8 !important;
+      border-color: var(--theme-border) !important;
+    }
+    html.light #chartPointsCount {
+      color: #726553 !important;
+    }
+    html.light #liveChartScrollWrapper + div button {
+      color: #966837 !important;
+    }
+
+    /* ------------------------------------------------------------- */
+    /* SECTION 3: MEDIA LIBRARY & WATCH PANEL                        */
+    /* ------------------------------------------------------------- */
+    html.light #catalogSearch {
+      background-color: #FAF5E8 !important;
+      border-color: #D5C8B2 !important;
+      color: #16110D !important;
+    }
+    html.light #sectionLibrary button.bg-blue-600 {
+      background-color: #966837 !important;
+      color: #FFFFFF !important;
+    }
+    html.light #sectionLibrary button.bg-blue-600:hover {
+      background-color: #7D562D !important;
+    }
+    html.light #catalogGrid > div {
+      background-color: #FFFFFF !important;
+      border-color: var(--theme-border) !important;
+    }
+    html.light #catalogGrid > div:hover {
+      border-color: var(--theme-border-strong) !important;
+      box-shadow: 0 4px 14px -2px rgba(72, 63, 52, 0.08) !important;
+    }
+    html.light #catalogGrid h4 {
+      color: #16110D !important;
+    }
+    html.light #catalogGrid h4:hover {
+      color: #966837 !important;
+    }
+    html.light #catalogGrid .bg-slate-100 {
+      background-color: #FAF5E8 !important;
+      border: 1px solid var(--theme-border) !important;
+      color: #16110D !important;
+    }
+    html.light #catalogGrid .bg-blue-50 {
+      background-color: #EADEAC !important;
+      border-color: #CAAD91 !important;
+      color: #16110D !important;
+    }
+    html.light #watchPanel {
+      background-color: #FFFFFF !important;
+      border-color: var(--theme-border) !important;
+    }
+    html.light #watchTitle {
+      color: #16110D !important;
+    }
+    html.light #watchMeta {
+      color: #726553 !important;
+    }
+    html.light #sendToLabBtn {
+      background: linear-gradient(135deg, #966837 0%, #A89A5D 100%) !important;
+      color: #FFFFFF !important;
+    }
+
+    /* ------------------------------------------------------------- */
+    /* SECTION 4: BENCHMARK MATRIX & PUBLICATION FIGURES             */
+    /* ------------------------------------------------------------- */
+    html.light #runPairedBtn {
+      background: linear-gradient(135deg, #966837 0%, #A89A5D 100%) !important;
+      color: #FFFFFF !important;
+    }
+    html.light #btnGeneratePlots {
+      background-color: #FAF5E8 !important;
+      border-color: var(--theme-border) !important;
+      color: #16110D !important;
+    }
+    html.light #btnGeneratePlots:hover {
+      background-color: #EADEAC !important;
+    }
+    html.light #plotsGallery > div {
+      background-color: #FFFFFF !important;
+      border-color: var(--theme-border) !important;
+    }
+    html.light #plotsGallery > div:hover {
+      border-color: var(--theme-border-strong) !important;
+    }
+    html.light #plotsGallery h5 {
+      color: #16110D !important;
+    }
+    html.light #plotsGallery a {
+      color: #966837 !important;
+    }
+    html.light #plotsGallery span.bg-indigo-50 {
+      background-color: #EADEAC !important;
+      border-color: #CAAD91 !important;
+      color: #16110D !important;
+    }
+    .publication-figure-surface {
+      background-color: #FFFFFF !important;
+      border: 1px solid #E2D9C5 !important;
+      border-radius: 0.5rem;
+    }
+    html.dark .publication-figure-surface {
+      background-color: #F8FAFC !important;
+      border-color: #334155 !important;
+    }
+
+    /* Tables in Light & Dark Mode */
+    html.light table thead {
+      background-color: var(--theme-table-head) !important;
+      color: #16110D !important;
+      border-bottom: 1px solid #DCD0B9 !important;
+    }
+    html.light table tbody tr {
+      color: #16110D !important;
+      border-bottom: 1px solid #E8DFCB !important;
+    }
+    html.light table tbody tr:hover {
+      background-color: #F8F2E2 !important;
+    }
+    html.light table tbody td span.bg-blue-500\/20 {
+      background-color: #EFF6FF !important;
+      border-color: #BFDBFE !important;
+      color: #1D4ED8 !important;
+    }
+    html.light table tbody td span.bg-red-500\/20 {
+      background-color: #FEF2F2 !important;
+      border-color: #FECDD3 !important;
+      color: #B91C1C !important;
+    }
+
+    /* Modal in Light Mode */
+    html.light #diagnosticsModal > div {
+      background-color: #FFFFFF !important;
+      border-color: var(--theme-border) !important;
+      color: #16110D !important;
+    }
+    html.light #diagnosticsModal h3,
+    html.light #diagnosticsModal h4 {
+      color: #16110D !important;
+    }
+    html.light #diagnosticsModal div.bg-slate-800\/60 {
+      background-color: #FAF5E8 !important;
+      border-color: var(--theme-border) !important;
+      color: #16110D !important;
+    }
+
+    /* Custom Scrollbars */
+    .chart-scroll-wrapper {
+      overflow-x: auto;
+      overflow-y: hidden;
+      scrollbar-width: thin;
+      scrollbar-color: #A89A5D #FAF5E8;
+      -webkit-overflow-scrolling: touch;
+    }
+    html.dark .chart-scroll-wrapper {
+      scrollbar-color: #06B6D4 #161F30;
+    }
+    .chart-scroll-wrapper::-webkit-scrollbar {
+      height: 6px;
+    }
+    .chart-scroll-wrapper::-webkit-scrollbar-track {
+      background: var(--theme-bg-base);
+      border-radius: 4px;
+    }
+    .chart-scroll-wrapper::-webkit-scrollbar-thumb {
+      background: var(--theme-border-strong);
+      border-radius: 4px;
+    }
+    .chart-scroll-wrapper::-webkit-scrollbar-thumb:hover {
+      background: var(--theme-accent-olive);
+    }
+
+    /* Light Mode Table Scrollbars */
+    .light-scroll-wrapper {
+      overflow-x: auto;
+      scrollbar-width: thin;
+      scrollbar-color: #CAAD91 #FAF4E6;
+    }
+    .light-scroll-wrapper::-webkit-scrollbar {
+      height: 6px;
+      width: 6px;
+    }
+    .light-scroll-wrapper::-webkit-scrollbar-track {
+      background: var(--theme-bg-card-subtle);
+    }
+    .light-scroll-wrapper::-webkit-scrollbar-thumb {
+      background: var(--theme-border-strong);
+      border-radius: 4px;
+    }
+    .light-scroll-wrapper::-webkit-scrollbar-thumb:hover {
+      background: #966837;
+    }
+
+    /* Publication Figure Responsive Cards */
+    .publication-figure-img {
+      max-width: 100% !important;
+      height: auto !important;
+      display: block !important;
+      object-fit: contain;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    /* Smooth transitions */
+    .tab-content {
+      animation: fadeIn 0.18s ease-in-out;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(3px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body class="bg-[#F8FAFC] dark:bg-[#0B0F17] text-slate-800 dark:text-slate-100 min-h-screen font-sans antialiased flex flex-col md:flex-row overflow-x-hidden transition-colors duration-200">
+
+  <!-- ================================================================= -->
+  <!-- APPLICATION SIDEBAR -->
+  <!-- ================================================================= -->
+  <aside id="appSidebar" class="w-full md:w-64 bg-[#090D14] border-r border-[#1B2537] flex flex-col shrink-0 z-40 md:sticky md:top-0 md:h-screen">
+
+    <!-- Sidebar Header & Branding -->
+    <div class="p-5 border-b border-[#1B2537] flex items-center justify-between">
+      <div class="flex items-center space-x-3 cursor-pointer" onclick="switchTab('overview')">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 via-cyan-500 to-teal-400 flex items-center justify-center shadow-lg shadow-cyan-500/20 font-black text-white text-base tracking-wider">
+          SN
+        </div>
+        <div>
+          <div class="flex items-center space-x-1.5">
+            <span class="font-extrabold text-sm tracking-tight text-white">StreamNet</span>
+            <span class="text-[9px] font-bold px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">v2.5</span>
+          </div>
+          <p class="text-[10px] text-slate-400 font-medium">Protocol & Media Hub</p>
+        </div>
+      </div>
+      <!-- Mobile hamburger toggle button -->
+      <button class="md:hidden p-2 text-slate-400 hover:text-white" onclick="toggleMobileNav()">
+        <i data-lucide="menu" class="w-5 h-5"></i>
+      </button>
+    </div>
+
+    <!-- Navigation Menu Items -->
+    <div id="sidebarNavMenu" class="hidden md:flex flex-1 flex-col justify-between p-3.5 space-y-6 overflow-y-auto">
+      <div class="space-y-6">
+
+        <!-- Group: Monitoring & Real-Time Engine -->
+        <div class="space-y-1">
+          <div class="px-3 pb-1.5 flex items-center justify-between text-[10px] font-bold tracking-wider uppercase text-slate-400">
+            <span>Observability & Lab</span>
+            <span class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
+          </div>
+          <button id="navBtnOverview" onclick="switchTab('overview')" class="w-full text-left px-3 py-2 rounded-lg text-xs font-semibold flex items-center space-x-2.5 transition text-slate-300 hover:bg-[#131D2E] hover:text-white">
+            <i data-lucide="layout-dashboard" class="w-4 h-4 text-cyan-400"></i>
+            <span>System Overview</span>
+          </button>
+          <button id="navBtnLive" onclick="switchTab('live')" class="w-full text-left px-3 py-2 rounded-lg text-xs font-semibold flex items-center space-x-2.5 transition text-slate-300 hover:bg-[#131D2E] hover:text-white">
+            <i data-lucide="activity" class="w-4 h-4 text-blue-400"></i>
+            <span class="flex-1">Live Monitor</span>
+            <span id="navLivePulseDot" class="w-2 h-2 rounded-full bg-slate-600"></span>
+          </button>
+          <button id="navBtnExperiment" onclick="switchTab('experiment')" class="w-full text-left px-3 py-2 rounded-lg text-xs font-semibold flex items-center space-x-2.5 transition text-slate-300 hover:bg-[#131D2E] hover:text-white">
+            <i data-lucide="sliders" class="w-4 h-4 text-teal-400"></i>
+            <span>Experiment Lab</span>
+          </button>
+        </div>
+
+        <!-- Group: Media & Historical Records -->
+        <div class="space-y-1">
+          <div class="px-3 pb-1.5 flex items-center justify-between text-[10px] font-bold tracking-wider uppercase text-slate-400">
+            <span>Media & Analytics</span>
+            <span class="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>
+          </div>
+          <button id="navBtnLibrary" onclick="switchTab('library')" class="w-full text-left px-3 py-2 rounded-lg text-xs font-semibold flex items-center space-x-2.5 transition text-slate-300 hover:bg-[#131D2E] hover:text-white">
+            <i data-lucide="film" class="w-4 h-4 text-amber-400"></i>
+            <span>Media Library</span>
+          </button>
+          <button id="navBtnAnalytics" onclick="switchTab('analytics')" class="w-full text-left px-3 py-2 rounded-lg text-xs font-semibold flex items-center space-x-2.5 transition text-slate-300 hover:bg-[#131D2E] hover:text-white">
+            <i data-lucide="bar-chart-2" class="w-4 h-4 text-emerald-400"></i>
+            <span>Benchmark Matrix</span>
+          </button>
+        </div>
+
+      </div>
+
+      <!-- Sidebar Footer: Session Status & Quick Diagnostics -->
+      <div class="space-y-3 pt-3 border-t border-[#1B2537]">
+        <!-- Live Transport Status Pill -->
+        <div class="p-2.5 rounded-xl bg-[#111927] border border-[#1E2D44] space-y-1.5">
+          <div class="flex items-center justify-between text-[10px] font-medium text-slate-400">
+            <span>Transport Socket:</span>
+            <span id="sidebarProtocolBadge" class="font-mono font-bold text-blue-400">TCP</span>
+          </div>
+          <div class="flex items-center space-x-2">
+            <span id="sidebarStatusDot" class="w-2.5 h-2.5 rounded-full bg-slate-500"></span>
+            <span id="sidebarStatusText" class="text-xs font-bold text-white tracking-wide">IDLE</span>
+          </div>
+        </div>
+
+        <!-- LAN IP Indicator -->
+        <div class="px-2.5 py-1.5 rounded-lg bg-[#0F1622] text-[10px] text-slate-400 flex items-center justify-between border border-[#182335]">
+          <span class="flex items-center space-x-1.5">
+            <i data-lucide="wifi" class="w-3.5 h-3.5 text-cyan-400"></i>
+            <span>Host LAN:</span>
+          </span>
+          <span id="sidebarLanIp" class="font-mono font-bold text-cyan-300">127.0.0.1</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Hidden compatibility tab elements for automated tests -->
+    <div class="hidden">
+      <button id="tabBtnLibrary" onclick="switchTab('library')">Video Library</button>
+      <button id="tabBtnExperiment" onclick="switchTab('experiment')">Live Experiment Lab</button>
+      <button id="tabBtnAnalytics" onclick="switchTab('analytics')">Benchmark Matrix</button>
+    </div>
+  </aside>
+
+  <!-- ================================================================= -->
+  <!-- MAIN APPLICATION SHELL -->
+  <!-- ================================================================= -->
+  <div id="mainShell" class="flex-1 flex flex-col min-w-0 bg-[#F8FAFC] dark:bg-[#0B0F17] transition-colors duration-200">
+
+    <!-- Top Application Bar -->
+    <header id="topAppBar" class="border-b border-slate-200 dark:border-[#1B2537] bg-white/95 dark:bg-[#090D14]/90 backdrop-blur sticky top-0 z-30 px-5 py-3 flex items-center justify-between gap-4 transition-colors duration-200">
+
+      <!-- Left: Breadcrumb / Section Title -->
+      <div class="flex items-center space-x-3">
+        <h1 id="pageTitle" class="text-sm font-bold text-slate-900 dark:text-white tracking-tight flex items-center space-x-2">
+          <span>StreamNet Media Hub & Evaluation Lab</span>
+        </h1>
+        <span id="themeContextBadge" class="hidden sm:inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+          System Theme
+        </span>
+      </div>
+
+      <!-- Right: Global Actions & Connectivity Status -->
+      <div class="flex items-center space-x-2">
+        <!-- Ready Badge -->
+        <span id="globalStateBadge" class="hidden sm:inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5 animate-pulse"></span>
+          Ready
+        </span>
+
+        <!-- Global Theme Switcher Segmented Control -->
+        <div id="themeSelectorContainer" class="inline-flex items-center p-0.5 rounded-lg border bg-slate-100 dark:bg-[#111827] border-slate-300 dark:border-[#212E44] text-xs transition" role="radiogroup" aria-label="Dashboard Theme Mode">
+          <button type="button" id="themeBtnLight" onclick="setThemePreference('light')" class="px-2 py-1 rounded-md text-[11px] font-medium flex items-center space-x-1 transition" role="radio" aria-checked="false" aria-label="Light theme" title="Light Theme (Off-white / Slate)">
+            <i data-lucide="sun" class="w-3.5 h-3.5 text-amber-500"></i>
+            <span class="hidden sm:inline text-xs">Light</span>
+          </button>
+          <button type="button" id="themeBtnDark" onclick="setThemePreference('dark')" class="px-2 py-1 rounded-md text-[11px] font-medium flex items-center space-x-1 transition" role="radio" aria-checked="false" aria-label="Dark theme" title="Dark Theme (Charcoal / Navy)">
+            <i data-lucide="moon" class="w-3.5 h-3.5 text-indigo-400"></i>
+            <span class="hidden sm:inline text-xs">Dark</span>
+          </button>
+          <button type="button" id="themeBtnSystem" onclick="setThemePreference('system')" class="px-2 py-1 rounded-md text-[11px] font-medium flex items-center space-x-1 transition" role="radio" aria-checked="false" aria-label="System preference" title="System Theme (Follow OS preference)">
+            <i data-lucide="laptop" class="w-3.5 h-3.5 text-cyan-400"></i>
+            <span class="hidden sm:inline text-xs">System</span>
+          </button>
+        </div>
+
+        <!-- LAN & Diagnostics Trigger -->
+        <button onclick="toggleDiagnosticsModal()" class="px-3 py-1.5 bg-[#141C2B] hover:bg-[#1B2537] text-slate-200 rounded-lg text-xs font-semibold border border-[#212E44] flex items-center space-x-1.5 transition">
+          <i data-lucide="network" class="w-3.5 h-3.5 text-cyan-400"></i>
+          <span class="hidden sm:inline">LAN Diagnostics</span>
+        </button>
+
+        <!-- Refresh Button -->
+        <button onclick="refreshData()" title="Reload Data" class="p-2 text-xs bg-[#141C2B] hover:bg-[#1B2537] text-slate-300 rounded-lg border border-[#212E44] transition">
+          <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+        </button>
+      </div>
+
+    </header>
+
+    <!-- Main Dynamic Content Container -->
+    <main class="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+
+      <!-- ================================================================= -->
+      <!-- SECTION 0: SYSTEM OVERVIEW (DARK MONITORING) -->
+      <!-- ================================================================= -->
+      <section id="sectionOverview" class="tab-content space-y-6">
+
+        <!-- Welcome Hero Banner -->
+        <div class="p-6 rounded-2xl bg-gradient-to-r from-[#111A29] via-[#152238] to-[#0E1624] border border-[#1E2E48] shadow-xl relative overflow-hidden">
+          <div class="max-w-2xl space-y-2 relative z-10">
+            <div class="flex items-center space-x-2">
+              <span class="px-2.5 py-0.5 rounded text-[10px] font-extrabold uppercase bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                LAN Video & Audio Transport Observatory
+              </span>
+              <span class="text-xs text-slate-400">• TCP vs UDP Under Controlled Degradation</span>
+            </div>
+            <h2 class="text-xl font-extrabold text-white tracking-tight">
+              Comprehensive Real-Time Socket Observability & Media Hub
+            </h2>
+            <p class="text-xs text-slate-300 leading-relaxed">
+              StreamNet is an academic-grade network evaluation system evaluating native TCP binary stream framing against UDP fragmented datagram slices. Test media delivery across synthetic video, microphone feeds, and custom WAV files under user-space latency, loss, jitter, and token-bucket bandwidth throttling.
+            </p>
+          </div>
+          <!-- Decorative Background Icon -->
+          <div class="absolute -right-6 -bottom-6 opacity-10 pointer-events-none">
+            <i data-lucide="network" class="w-48 h-48 text-cyan-400"></i>
+          </div>
+        </div>
+
+        <!-- 4 Metric Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+
+          <div class="p-4 rounded-xl bg-[#111827] border border-[#1E2D44] shadow space-y-1">
+            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Transport Engine</span>
+            <div class="flex items-center justify-between">
+              <span id="overviewTransportEngine" class="text-lg font-black text-white font-mono">TCP / UDP</span>
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20">Active</span>
+            </div>
+            <span class="text-[11px] text-slate-500 block">Big-Endian Binary Framing</span>
+          </div>
+
+          <div class="p-4 rounded-xl bg-[#111827] border border-[#1E2D44] shadow space-y-1">
+            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Pipeline State</span>
+            <div class="flex items-center justify-between">
+              <span id="overviewPipelineState" class="text-lg font-black text-emerald-400 font-mono">IDLE</span>
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></span>
+            </div>
+            <span class="text-[11px] text-slate-500 block">Playout Buffer Primed</span>
+          </div>
+
+          <div class="p-4 rounded-xl bg-[#111827] border border-[#1E2D44] shadow space-y-1">
+            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Recorded Experiments</span>
+            <div class="flex items-center justify-between">
+              <span id="overviewRecordedCount" class="text-lg font-black text-cyan-300 font-mono">Master CSV</span>
+              <i data-lucide="database" class="w-4 h-4 text-cyan-400"></i>
+            </div>
+            <span class="text-[11px] text-slate-500 block">Controlled Benchmark Sweeps</span>
+          </div>
+
+          <div class="p-4 rounded-xl bg-[#111827] border border-[#1E2D44] shadow space-y-1">
+            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Media Assets</span>
+            <div class="flex items-center justify-between">
+              <span id="overviewMediaCount" class="text-lg font-black text-amber-300 font-mono">Library</span>
+              <i data-lucide="film" class="w-4 h-4 text-amber-400"></i>
+            </div>
+            <span class="text-[11px] text-slate-500 block">RFC 7233 Byte-Range Playback</span>
+          </div>
+
+        </div>
+
+        <!-- Quick Launch Navigation Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+
+          <div class="p-5 rounded-2xl bg-[#111827] border border-[#1E2D44] shadow hover:border-cyan-500/40 transition group cursor-pointer flex flex-col justify-between" onclick="switchTab('experiment')">
+            <div class="space-y-2">
+              <div class="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400 group-hover:bg-cyan-500 group-hover:text-white transition">
+                <i data-lucide="sliders" class="w-5 h-5"></i>
+              </div>
+              <h3 class="text-sm font-bold text-white group-hover:text-cyan-300 transition">Configure Experiment</h3>
+              <p class="text-xs text-slate-400">
+                Tune latency injection (0-400ms), packet drop (0-25%), token-bucket rate limits, and audio/video multiplexing.
+              </p>
+            </div>
+            <div class="pt-4 flex items-center text-xs font-semibold text-cyan-400 group-hover:translate-x-1 transition">
+              <span>Open Experiment Lab &rarr;</span>
+            </div>
+          </div>
+
+          <div class="p-5 rounded-2xl bg-[#111827] border border-[#1E2D44] shadow hover:border-blue-500/40 transition group cursor-pointer flex flex-col justify-between" onclick="switchTab('live')">
+            <div class="space-y-2">
+              <div class="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 group-hover:bg-blue-500 group-hover:text-white transition">
+                <i data-lucide="activity" class="w-5 h-5"></i>
+              </div>
+              <h3 class="text-sm font-bold text-white group-hover:text-blue-300 transition">Inspect Live Monitor</h3>
+              <p class="text-xs text-slate-400">
+                Observe client-received MJPEG frames, genuine transport telemetry, audio jitter buffers, and scrollable bandwidth charts.
+              </p>
+            </div>
+            <div class="pt-4 flex items-center text-xs font-semibold text-blue-400 group-hover:translate-x-1 transition">
+              <span>View Real-Time Telemetry &rarr;</span>
+            </div>
+          </div>
+
+          <div class="p-5 rounded-2xl bg-[#111827] border border-[#1E2D44] shadow hover:border-amber-500/40 transition group cursor-pointer flex flex-col justify-between" onclick="switchTab('library')">
+            <div class="space-y-2">
+              <div class="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 group-hover:bg-amber-500 group-hover:text-white transition">
+                <i data-lucide="film" class="w-5 h-5"></i>
+              </div>
+              <h3 class="text-sm font-bold text-white group-hover:text-amber-300 transition">Browse Media Library</h3>
+              <p class="text-xs text-slate-400">
+                Stream host MP4/WebM videos with seekable HTTP byte-range requests and select custom media to transmit across sockets.
+              </p>
+            </div>
+            <div class="pt-4 flex items-center text-xs font-semibold text-amber-400 group-hover:translate-x-1 transition">
+              <span>Explore Light Media Library &rarr;</span>
+            </div>
+          </div>
+
+        </div>
+
+      </section>
+
+      <!-- ================================================================= -->
+      <!-- SECTION 1: LIVE EXPERIMENT LAB (DARK MONITORING) -->
+      <!-- ================================================================= -->
+      <section id="sectionExperiment" class="tab-content space-y-6">
+
+        <!-- Banner & Audio Status -->
+        <div class="bg-gradient-to-r from-blue-950/40 via-cyan-950/30 to-[#111827] rounded-xl border border-cyan-500/30 p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+          <div class="space-y-1">
+            <div class="flex items-center space-x-2">
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                TRANSPORT PROTOCOL UNDER TEST
+              </span>
+              <h2 class="text-sm font-bold text-white">Native Socket Streaming under Controlled Degradation</h2>
+            </div>
+            <p class="text-xs text-slate-300">
+              Evaluating native application-layer TCP stream framing versus UDP fragmented datagram transport through socket-level proxy impairment.
+            </p>
+          </div>
+          <!-- Audio Transmission Status Badge -->
+          <div id="audioStatusBadge" class="px-3 py-1.5 rounded-lg bg-[#111827] border border-slate-700 text-slate-300 text-[11px] font-medium flex items-center space-x-1.5 whitespace-nowrap">
+            <i id="audioStatusIcon" data-lucide="volume-x" class="w-4 h-4 text-slate-400"></i>
+            <span id="audioStatusText">Audio: Video transport evaluation only</span>
+          </div>
+        </div>
+
+        <!-- Configuration Console Card -->
+        <div class="bg-[#111827] rounded-xl border border-[#1E2D44] p-6 shadow-xl space-y-6">
+          <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-4 border-b border-[#1E2D44] gap-4">
+            <div>
+              <h3 class="text-base font-bold text-white flex items-center space-x-2">
+                <i data-lucide="sliders" class="w-5 h-5 text-cyan-400"></i>
+                <span>Live Streaming Session Configuration</span>
+              </h3>
+              <p class="text-xs text-slate-400">Configure protocol, input media, and socket impairment parameters.</p>
+            </div>
+            <!-- Preset Profiles Dropdown -->
+            <div class="flex items-center space-x-2">
+              <label class="text-xs text-slate-300 font-medium">Degradation Preset:</label>
+              <select id="labPresetSelect" onchange="applyLabPreset()" class="bg-[#162032] border border-[#23334E] rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500">
+                <option value="CUSTOM">Custom Parameters</option>
+                <option value="IDEAL">Ideal / Local Network</option>
+                <option value="FIBER_EXCELLENT">Fiber Broadband (Excellent)</option>
+                <option value="CABLE_GOOD">Cable Broadband (Good)</option>
+                <option value="MOBILE_4G">4G LTE Mobile</option>
+                <option value="CONGESTED_WIFI">Congested 2.4GHz Wi-Fi</option>
+                <option value="POOR_CELLULAR_3G">Poor Cellular / 3G</option>
+                <option value="SATELLITE_GEO">Geostationary Satellite</option>
+                <option value="SEVERE_DEGRADATION">Severe Degradation</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Protocol & Video Source Selectors -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Protocol Toggle -->
+            <div class="space-y-2">
+              <label class="text-xs text-slate-300 font-semibold block">Transport Protocol Under Test</label>
+              <div class="grid grid-cols-2 gap-3">
+                <button id="protoBtnTCP" onclick="selectProtocol('TCP')" class="py-2.5 px-4 rounded-lg border-2 border-blue-500 bg-blue-500/20 text-blue-300 font-bold text-xs flex items-center justify-center space-x-2 transition">
+                  <span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
+                  <span>TCP (Stream Framing)</span>
+                </button>
+                <button id="protoBtnUDP" onclick="selectProtocol('UDP')" class="py-2.5 px-4 rounded-lg border border-slate-700 bg-[#162032] text-slate-400 font-bold text-xs flex items-center justify-center space-x-2 hover:border-red-500/50 transition">
+                  <span class="w-2.5 h-2.5 rounded-full bg-slate-500"></span>
+                  <span>UDP (Datagram Slices)</span>
+                </button>
+              </div>
+              <p class="text-[11px] text-slate-400">
+                <span id="protoDesc">TCP uses binary framing with head-of-line blocking resilience testing.</span>
+              </p>
+            </div>
+
+            <!-- Video Source Selector -->
+            <div class="space-y-2">
+              <label class="text-xs text-slate-300 font-semibold block">Video Input Source</label>
+              <select id="labVideoSource" class="w-full bg-[#162032] border border-[#23334E] rounded-lg px-3 py-2.5 text-xs text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500">
+                <option value="synthetic">Synthetic Stream (Bouncing Ball Generator - Benchmark Default)</option>
+              </select>
+              <div class="flex items-center justify-between text-[11px] text-slate-400">
+                <span>Workload: 150 Frames (640x480 @ 30 FPS, JPEG Q75)</span>
+                <span class="text-slate-500">Note: Audio is not transmitted in video-only mode</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Media Mode Selector -->
+          <div class="space-y-2 pt-2 border-t border-[#1E2D44]">
+            <label class="text-xs text-slate-300 font-semibold block">Media Transmission Mode</label>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <button id="mediaModeVideo" onclick="selectMediaMode('video')" class="py-2 px-3 rounded-lg border-2 border-cyan-500 bg-cyan-500/20 text-cyan-300 font-bold text-xs flex items-center justify-center space-x-2 transition">
+                <i data-lucide="video" class="w-3.5 h-3.5"></i>
+                <span>Video Only</span>
+              </button>
+              <button id="mediaModeAudio" onclick="selectMediaMode('audio')" class="py-2 px-3 rounded-lg border border-slate-700 bg-[#162032] text-slate-400 font-bold text-xs flex items-center justify-center space-x-2 hover:border-amber-500/50 transition">
+                <i data-lucide="volume-2" class="w-3.5 h-3.5"></i>
+                <span>Audio Only</span>
+              </button>
+              <button id="mediaModeAV" onclick="selectMediaMode('audio_video')" class="py-2 px-3 rounded-lg border border-slate-700 bg-[#162032] text-slate-400 font-bold text-xs flex items-center justify-center space-x-2 hover:border-purple-500/50 transition">
+                <i data-lucide="film" class="w-3.5 h-3.5"></i>
+                <span>Synced Audio + Video</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Audio Configuration Options -->
+          <div id="audioConfigPanel" class="hidden grid grid-cols-1 md:grid-cols-3 gap-4 p-4 rounded-xl bg-[#0E1522] border border-amber-500/30">
+            <div class="space-y-1">
+              <label class="text-xs text-slate-300 font-semibold block">Audio Source</label>
+              <select id="labAudioSource" onchange="updateAudioSourceUI()" class="w-full bg-[#162032] border border-[#23334E] rounded-lg px-2.5 py-1.5 text-xs text-slate-200">
+                <option value="synthetic">Synthetic Tone Generator</option>
+                <option value="custom">Custom WAV Audio File</option>
+                <option value="mic">Live Microphone (Browser Input)</option>
+              </select>
+            </div>
+            <div id="audioPatternCol" class="space-y-1">
+              <label class="text-xs text-slate-300 font-semibold block">Tone Pattern</label>
+              <select id="labAudioPattern" class="w-full bg-[#162032] border border-[#23334E] rounded-lg px-2.5 py-1.5 text-xs text-slate-200">
+                <option value="sine">440 Hz Sine Tone (A4 Pitch)</option>
+                <option value="ping">880 Hz Acoustic Radar Ping (Pulsed)</option>
+              </select>
+            </div>
+            <div id="audioCustomCol" class="hidden space-y-1">
+              <label class="text-xs text-slate-300 font-semibold block">Select WAV File</label>
+              <select id="labAudioFileSelect" class="w-full bg-[#162032] border border-[#23334E] rounded-lg px-2.5 py-1.5 text-xs text-slate-200">
+                <option value="">No WAV files in library</option>
+              </select>
+            </div>
+            <div class="space-y-1">
+              <label class="text-xs text-slate-300 font-semibold block">Transport Encoding</label>
+              <div class="text-xs text-slate-400 py-1.5 font-mono">
+                <span class="text-cyan-300">16,000 Hz</span> • 16-bit PCM • Mono
+              </div>
+            </div>
+          </div>
+
+          <!-- Impairment Sliders Grid -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 pt-2">
+            <!-- Latency -->
+            <div class="space-y-1.5 bg-[#162032]/60 p-3.5 rounded-xl border border-[#23334E]">
+              <div class="flex justify-between text-xs">
+                <span class="text-slate-300 font-medium">One-Way Latency</span>
+                <span id="labLatencyVal" class="text-cyan-400 font-bold font-mono">0 ms</span>
+              </div>
+              <input type="range" id="labLatencyInput" min="0" max="400" step="5" value="0" oninput="updateLabSliderLabels()" class="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-cyan-400">
+              <div class="flex justify-between text-[10px] text-slate-500 font-mono">
+                <span>0 ms</span>
+                <span>200 ms</span>
+                <span>400 ms</span>
+              </div>
+            </div>
+
+            <!-- Packet Loss -->
+            <div class="space-y-1.5 bg-[#162032]/60 p-3.5 rounded-xl border border-[#23334E]">
+              <div class="flex justify-between text-xs">
+                <span class="text-slate-300 font-medium">Packet Drop Rate</span>
+                <span id="labLossVal" class="text-red-400 font-bold font-mono">0.0 %</span>
+              </div>
+              <input type="range" id="labLossInput" min="0" max="25" step="0.5" value="0" oninput="updateLabSliderLabels()" class="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-red-400">
+              <div class="flex justify-between text-[10px] text-slate-500 font-mono">
+                <span>0%</span>
+                <span>12.5%</span>
+                <span>25%</span>
+              </div>
+            </div>
+
+            <!-- Bandwidth Limit -->
+            <div class="space-y-1.5 bg-[#162032]/60 p-3.5 rounded-xl border border-[#23334E]">
+              <div class="flex justify-between text-xs">
+                <span class="text-slate-300 font-medium">Bandwidth Cap</span>
+                <span id="labBwVal" class="text-emerald-400 font-bold font-mono">Unlimited</span>
+              </div>
+              <input type="range" id="labBwInput" min="0" max="20" step="0.5" value="0" oninput="updateLabSliderLabels()" class="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-emerald-400">
+              <div class="flex justify-between text-[10px] text-slate-500 font-mono">
+                <span>Unlimited</span>
+                <span>10 Mbps</span>
+                <span>20 Mbps</span>
+              </div>
+            </div>
+
+            <!-- Jitter -->
+            <div class="space-y-1.5 bg-[#162032]/60 p-3.5 rounded-xl border border-[#23334E]">
+              <div class="flex justify-between text-xs">
+                <span class="text-slate-300 font-medium">Jitter (StdDev)</span>
+                <span id="labJitterVal" class="text-amber-400 font-bold font-mono">0 ms</span>
+              </div>
+              <input type="range" id="labJitterInput" min="0" max="80" step="2" value="0" oninput="updateLabSliderLabels()" class="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-amber-400">
+              <div class="flex justify-between text-[10px] text-slate-500 font-mono">
+                <span>0 ms</span>
+                <span>40 ms</span>
+                <span>80 ms</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Action Controls Bar -->
+          <div class="flex flex-col sm:flex-row items-center justify-between pt-4 border-t border-[#1E2D44] gap-4">
+            <div class="text-xs text-slate-400 flex items-center space-x-2">
+              <span class="w-2.5 h-2.5 rounded-full" id="sessionStatusDot" style="background-color: #64748b;"></span>
+              <span>Session State: <strong id="sessionStateText" class="text-white font-mono">IDLE</strong></span>
+            </div>
+            <div class="flex items-center space-x-3">
+              <button onclick="switchTab('live')" class="px-4 py-2.5 rounded-lg bg-[#162032] hover:bg-[#1E2D44] text-slate-300 text-xs font-semibold border border-[#23334E] flex items-center space-x-1.5 transition">
+                <i data-lucide="activity" class="w-4 h-4 text-cyan-400"></i>
+                <span>Open Live Monitor &rarr;</span>
+              </button>
+              <button id="startStreamBtn" onclick="startLiveStreamingSession()" class="px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-semibold text-xs rounded-lg shadow-lg shadow-emerald-500/20 flex items-center space-x-2 transition disabled:opacity-50">
+                <i data-lucide="play" class="w-4 h-4"></i>
+                <span>Start Live Stream</span>
+              </button>
+              <button id="stopStreamBtn" onclick="stopLiveStreamingSession()" disabled class="px-4 py-2.5 bg-red-600/20 hover:bg-red-600/30 text-red-300 font-semibold text-xs rounded-lg border border-red-500/30 flex items-center space-x-1.5 transition disabled:opacity-40">
+                <i data-lucide="square" class="w-4 h-4"></i>
+                <span>Stop Session</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ================================================================= -->
+      <!-- SECTION 2: LIVE MONITOR VIEWPORT & TELEMETRY (DARK MONITORING) -->
+      <!-- ================================================================= -->
+      <section id="sectionLive" class="tab-content space-y-6">
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+          <!-- Left: Live MJPEG Video Viewport (7 Cols) -->
+          <div class="lg:col-span-7 bg-[#111827] rounded-2xl border border-[#1E2D44] p-4 shadow-xl space-y-3">
+            <div class="flex items-center justify-between pb-2 border-b border-[#1E2D44]">
+              <div class="flex items-center space-x-2">
+                <span id="playerProtoBadge" class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                  TCP STREAM
+                </span>
+                <h4 class="text-xs font-bold text-white uppercase tracking-wider">Client Received Frame Viewport</h4>
+              </div>
+              <div class="flex items-center space-x-2 text-[11px]">
+                <span class="text-slate-400">Playout FPS:</span>
+                <span id="liveFpsVal" class="font-mono font-bold text-cyan-400">0.0</span>
+              </div>
+            </div>
+
+            <!-- Video Viewport Frame -->
+            <div class="relative bg-black rounded-xl aspect-video overflow-hidden flex items-center justify-center border border-slate-800 shadow-inner">
+              <!-- Active MJPEG stream image -->
+              <img id="liveFeedImg" alt="Live Stream Viewport" class="hidden w-full h-full object-contain">
+
+              <!-- Standby Display when stream is inactive -->
+              <div id="standbyScreen" class="text-center p-8 space-y-3">
+                <div class="w-12 h-12 rounded-xl bg-slate-800/80 border border-slate-700 flex items-center justify-center mx-auto text-slate-500">
+                  <i data-lucide="radio" class="w-6 h-6"></i>
+                </div>
+                <p class="text-xs font-semibold text-slate-300">Streaming Pipeline Standby</p>
+                <p class="text-[11px] text-slate-500 max-w-xs mx-auto">
+                  Select protocol and network conditions in the Experiment Lab, then click "Start Live Stream" to begin real-time socket transmission.
+                </p>
+              </div>
+
+              <!-- Buffer State Overlay Badge -->
+              <div id="bufferStateBadge" class="hidden absolute bottom-3 left-3 px-2 py-1 rounded bg-slate-900/80 backdrop-blur text-[10px] font-mono border border-slate-700 text-slate-300">
+                Buffer: <span id="bufferStateVal" class="text-cyan-400 font-bold">INITIAL_BUFFERING</span>
+              </div>
+            </div>
+
+            <!-- Browser Bridge Overhead Disclosure Banner -->
+            <div class="bg-[#162032]/60 rounded-xl p-2.5 border border-[#23334E] flex items-center justify-between text-[11px] text-slate-400">
+              <span class="flex items-center space-x-1.5">
+                <i data-lucide="monitor" class="w-3.5 h-3.5 text-slate-400"></i>
+                <span>Local Display Bridge:</span>
+              </span>
+              <div class="flex items-center space-x-3 font-mono">
+                <span>Delivered: <strong id="bridgeDelivered" class="text-slate-200">0</strong></span>
+                <span>Bridge Drops: <strong id="bridgeDropped" class="text-amber-400">0</strong></span>
+                <span>Queue: <strong id="bridgeQueue" class="text-slate-200">0</strong>/15</span>
+              </div>
+            </div>
+
+            <!-- Live Audio Playout Controller Bar -->
+            <div id="liveAudioControlsBar" class="bg-[#162032]/60 rounded-xl p-2.5 border border-[#23334E] flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-300">
+              <div class="flex items-center space-x-2">
+                <span class="flex items-center space-x-1 text-slate-400">
+                  <i data-lucide="headphones" class="w-3.5 h-3.5"></i>
+                  <span>Live Audio:</span>
+                </span>
+                <button id="liveAudioMuteBtn" onclick="toggleLiveAudioMute()" class="px-2.5 py-1 rounded bg-slate-700 hover:bg-slate-600 text-white font-semibold flex items-center space-x-1 transition text-[10px]">
+                  <i id="liveAudioMuteIcon" data-lucide="volume-2" class="w-3 h-3 text-emerald-400"></i>
+                  <span id="liveAudioMuteText">Mute</span>
+                </button>
+                <input type="range" id="liveAudioVol" min="0" max="1" step="0.05" value="0.8" oninput="setLiveAudioVolume(this.value)" class="w-16 h-1 bg-slate-600 rounded appearance-none accent-cyan-400 cursor-pointer" title="Volume">
+                <audio id="liveAudioPlayer" class="hidden" autoplay preload="none"></audio>
+              </div>
+              <!-- VU Level Meter & Status -->
+              <div class="flex items-center space-x-2">
+                <span class="text-[10px] text-slate-400">Level:</span>
+                <div class="w-16 h-2 bg-slate-900 rounded-full overflow-hidden border border-slate-700">
+                  <div id="audioLevelBar" class="h-full bg-emerald-400 transition-all duration-75" style="width: 0%;"></div>
+                </div>
+                <span id="audioFeedStatus" class="font-mono text-[10px] text-slate-400">STANDBY</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right: Unsimulated Real-Time KPI Cards (5 Cols) -->
+          <div class="lg:col-span-5 space-y-4">
+            <div class="bg-[#111827] rounded-2xl border border-[#1E2D44] p-4 shadow-xl">
+              <h4 class="text-xs font-bold text-white uppercase tracking-wider mb-3 flex items-center space-x-1.5">
+                <i data-lucide="activity" class="w-4 h-4 text-cyan-400"></i>
+                <span>Live Transport Telemetry (Active Session)</span>
+              </h4>
+
+              <div class="grid grid-cols-2 gap-3">
+                <!-- Raw Throughput -->
+                <div class="bg-[#162032]/60 p-2.5 rounded-lg border border-[#23334E]">
+                  <span class="text-[10px] text-slate-400 block">Raw Throughput</span>
+                  <span id="kpiThroughput" class="text-lg font-bold text-white font-mono">0.00 Mbps</span>
+                </div>
+                <!-- Video Goodput -->
+                <div class="bg-[#162032]/60 p-2.5 rounded-lg border border-[#23334E]">
+                  <span class="text-[10px] text-slate-400 block">Video Goodput</span>
+                  <span id="kpiGoodput" class="text-lg font-bold text-cyan-300 font-mono">0.00 Mbps</span>
+                </div>
+                <!-- Mean Transit Delay -->
+                <div class="bg-[#162032]/60 p-2.5 rounded-lg border border-[#23334E]">
+                  <span class="text-[10px] text-slate-400 block">Mean Transit Delay</span>
+                  <span id="kpiLatency" class="text-lg font-bold text-white font-mono">0.0 ms</span>
+                </div>
+                <!-- RFC 3550 Jitter -->
+                <div class="bg-[#162032]/60 p-2.5 rounded-lg border border-[#23334E]">
+                  <span class="text-[10px] text-slate-400 block">RFC 3550 Jitter</span>
+                  <span id="kpiJitter" class="text-lg font-bold text-amber-300 font-mono">0.0 ms</span>
+                </div>
+                <!-- Frame Delivery Ratio -->
+                <div class="bg-[#162032]/60 p-2.5 rounded-lg border border-[#23334E]">
+                  <span class="text-[10px] text-slate-400 block">Frame Delivery Ratio</span>
+                  <span id="kpiFdr" class="text-lg font-bold text-emerald-400 font-mono">100.0%</span>
+                </div>
+                <!-- Packet Drop Rate -->
+                <div class="bg-[#162032]/60 p-2.5 rounded-lg border border-[#23334E]">
+                  <span class="text-[10px] text-slate-400 block">Packet Drop Rate</span>
+                  <span id="kpiLoss" class="text-lg font-bold text-red-400 font-mono">0.0%</span>
+                </div>
+                <!-- Rebuffering Stalls -->
+                <div class="bg-[#162032]/60 p-2.5 rounded-lg border border-[#23334E]">
+                  <span class="text-[10px] text-slate-400 block">Buffer Stalls</span>
+                  <span id="kpiStalls" class="text-lg font-bold text-amber-400 font-mono">0 (0.0s)</span>
+                </div>
+                <!-- Buffer Depth -->
+                <div class="bg-[#162032]/60 p-2.5 rounded-lg border border-[#23334E]">
+                  <span class="text-[10px] text-slate-400 block">Buffer Depth</span>
+                  <span id="kpiBufferDepth" class="text-lg font-bold text-slate-200 font-mono">0.0 ms</span>
+                </div>
+
+                <!-- Audio Specific Metrics Row (Visible when Audio or Synced AV is active) -->
+                <div id="audioKpiRow" class="hidden col-span-2 grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-[#1E2D44]">
+                  <div class="bg-[#162032]/40 p-2 rounded border border-amber-500/20">
+                    <span class="text-[9px] text-amber-300 font-semibold block">Audio Bitrate</span>
+                    <span id="kpiAudioBitrate" class="text-xs font-bold text-white font-mono">0.0 kbps</span>
+                  </div>
+                  <div class="bg-[#162032]/40 p-2 rounded border border-amber-500/20">
+                    <span class="text-[9px] text-amber-300 font-semibold block">Audio Buffer</span>
+                    <span id="kpiAudioBuffer" class="text-xs font-bold text-white font-mono">0.0 ms</span>
+                  </div>
+                  <div class="bg-[#162032]/40 p-2 rounded border border-amber-500/20">
+                    <span class="text-[9px] text-amber-300 font-semibold block">Audio Underruns</span>
+                    <span id="kpiAudioUnderruns" class="text-xs font-bold text-amber-400 font-mono">0</span>
+                  </div>
+                  <div class="bg-[#162032]/40 p-2 rounded border border-amber-500/20">
+                    <span class="text-[9px] text-amber-300 font-semibold block">Audio Packet Loss</span>
+                    <span id="kpiAudioLoss" class="text-xs font-bold text-red-400 font-mono">0.0%</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Rolling Telemetry Chart Card -->
+            <div class="bg-[#111827] rounded-2xl border border-[#1E2D44] p-4 shadow-xl space-y-2">
+              <div class="flex items-center justify-between">
+                <h4 class="text-[11px] font-bold text-slate-300 uppercase tracking-wider">Live Bandwidth Dynamics</h4>
+                <div class="flex items-center space-x-2">
+                  <span id="chartPointsCount" class="text-[10px] text-slate-400 font-mono">0 pts</span>
+                  <button onclick="resetChartScroll()" title="Scroll to latest point" class="text-[10px] text-cyan-400 hover:text-cyan-300 hover:underline">Latest &rarr;</button>
+                </div>
+              </div>
+              <!-- Independent Horizontal Scroll Container -->
+              <div id="liveChartScrollWrapper" class="chart-scroll-wrapper relative w-full h-44 overflow-x-auto overflow-y-hidden rounded-xl bg-slate-900/50 p-1 border border-slate-800">
+                <div id="liveChartContent" class="h-full relative" style="min-width: 100%; width: 100%;">
+                  <canvas id="liveChart"></canvas>
+                </div>
+              </div>
+              <div class="flex items-center justify-between text-[10px] text-slate-500">
+                <span>↔ Scroll horizontally to inspect full session history</span>
+                <span class="font-mono">Mouse-wheel / Trackpad / Touch</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ================================================================= -->
+      <!-- SECTION 3: MEDIA LIBRARY -->
+      <!-- ================================================================= -->
+      <section id="sectionLibrary" class="tab-content hidden space-y-6">
+
+        <!-- Catalog Controls & Search Bar -->
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white dark:bg-[#111827] p-5 rounded-xl border border-slate-200/90 dark:border-[#1E2D44] shadow-sm">
+          <div>
+            <div class="flex items-center space-x-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-blue-600"></span>
+              <h2 class="text-base font-extrabold text-slate-900 dark:text-white flex items-center space-x-2">
+                <span>Host Video Library</span>
+              </h2>
+              <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-500/30">HTTP Catalogue</span>
+            </div>
+            <p id="mediaDirLabel" class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Serving videos from host laptop media directory</p>
+            <div id="lanQuickList" class="text-[11px] text-blue-600 font-mono mt-1 flex flex-wrap gap-2 items-center"></div>
+          </div>
+
+          <div class="flex items-center space-x-3 w-full sm:w-auto">
+            <!-- Search Input -->
+            <div class="w-full sm:w-64 relative">
+              <i data-lucide="search" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+              <input type="text" id="catalogSearch" oninput="filterCatalog()" placeholder="Search video title or file..." class="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-3 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition">
+            </div>
+
+            <!-- Rescan Button -->
+            <button onclick="loadCatalog()" class="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg shadow-sm flex items-center space-x-1.5 transition whitespace-nowrap">
+              <i data-lucide="rotate-cw" class="w-3.5 h-3.5"></i>
+              <span>Re-scan</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Video Watch Panel (Theater Mode - Shown when a video is selected) -->
+        <div id="watchPanel" class="hidden bg-white rounded-xl border border-slate-200 p-6 shadow-md space-y-4">
+          <!-- Watch Header & Navigation -->
+          <div class="flex items-center justify-between pb-3 border-b border-slate-200">
+            <button onclick="closeWatchPanel()" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition">
+              <i data-lucide="arrow-left" class="w-4 h-4"></i>
+              <span>Back to Video Catalogue</span>
+            </button>
+            <!-- Notice Label distinguishing HTTP from TCP/UDP experiments -->
+            <div class="text-[11px] px-3 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200 flex items-center space-x-1.5 font-medium">
+              <i data-lucide="info" class="w-3.5 h-3.5 text-blue-600"></i>
+              <span>Baseline HTTP Media Stream (RFC 7233 Seekable Playback)</span>
+            </div>
+          </div>
+
+          <!-- Codec Incompatibility Notice -->
+          <div id="playerCodecWarning" class="hidden rounded-lg bg-amber-50 border border-amber-200 p-3.5 text-xs text-amber-900 flex items-start space-x-2.5">
+            <i data-lucide="alert-circle" class="w-4 h-4 text-amber-600 shrink-0 mt-0.5"></i>
+            <div>
+              <span class="font-bold text-amber-800">Browser Codec Mismatch Notice:</span>
+              <span id="playerCodecWarningText" class="text-amber-700 block mt-0.5"></span>
+            </div>
+          </div>
+
+          <!-- Player Error & Codec Diagnostic Alert -->
+          <div id="playerErrorBanner" class="hidden rounded-lg bg-red-50 border border-red-200 p-4 text-xs text-red-900 space-y-2">
+            <div class="flex items-center space-x-2 font-bold text-red-800">
+              <i data-lucide="alert-triangle" class="w-4 h-4 text-red-600"></i>
+              <span id="playerErrorTitle">Video Playback Failed</span>
+            </div>
+            <p id="playerErrorMessage" class="text-red-700"></p>
+            <div id="playerErrorRemedy" class="text-[11px] font-mono text-slate-800 bg-slate-100 p-3 rounded border border-slate-300 mt-1 select-all"></div>
+          </div>
+
+          <!-- HTML5 Video Player Viewport -->
+          <div class="relative bg-black rounded-xl overflow-hidden aspect-video max-h-[560px] mx-auto border border-slate-800 flex items-center justify-center shadow-lg">
+            <video id="html5Player" controls playsinline preload="metadata" class="w-full h-full object-contain">
+              Your browser does not support HTML5 video streaming.
+            </video>
+          </div>
+
+          <!-- Video Metadata Details Bar -->
+          <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pt-2">
+            <div>
+              <h3 id="watchTitle" class="text-lg font-bold text-slate-900">Video Title</h3>
+              <p id="watchMeta" class="text-xs text-slate-500">Resolution • FPS • Size • Duration</p>
+            </div>
+            <div class="flex items-center space-x-3">
+              <button id="sendToLabBtn" onclick="launchWatchVideoInLab()" class="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold text-xs rounded-lg shadow-sm flex items-center space-x-2 transition">
+                <i data-lucide="sliders" class="w-4 h-4"></i>
+                <span>Test in Live Experiment Lab</span>
+              </button>
+              <button id="copyStreamUrlBtn" onclick="copyCurrentStreamUrl()" class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-medium border border-slate-300 flex items-center space-x-1.5 transition">
+                <i data-lucide="link" class="w-4 h-4"></i>
+                <span>Copy Stream URL</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Video Grid View (Light Theme) -->
+        <div id="catalogGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div class="col-span-full py-16 text-center text-slate-400 space-y-2">
+            <i data-lucide="loader-2" class="w-8 h-8 mx-auto animate-spin text-blue-600"></i>
+            <p class="text-xs text-slate-500 font-medium">Scanning media catalogue...</p>
+          </div>
+        </div>
+
+        <!-- Empty State View (Light Theme) -->
+        <div id="catalogEmptyState" class="hidden bg-white rounded-xl border border-slate-200 p-12 text-center space-y-3">
+          <div class="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto text-slate-400">
+            <i data-lucide="video-off" class="w-6 h-6"></i>
+          </div>
+          <h4 class="text-base font-bold text-slate-900">No Video Files Found</h4>
+          <p class="text-xs text-slate-500 max-w-md mx-auto">
+            No compatible video files were found in the configured host media directory. Place MP4 or WebM files into the <code class="text-blue-600 font-mono">media/</code> folder to view them here.
+          </p>
+          <button onclick="loadCatalog()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg transition">
+            Re-scan Media Folder
+          </button>
+        </div>
+
+      </section>
+
+      <!-- ================================================================= -->
+      <!-- SECTION 4: BENCHMARK MATRIX & HISTORICAL ANALYTICS -->
+      <!-- ================================================================= -->
+      <section id="sectionAnalytics" class="tab-content hidden space-y-6">
+
+        <!-- Paired Benchmark Launcher Card -->
+        <div class="bg-white dark:bg-[#111827] rounded-xl border border-slate-200 dark:border-[#1E2D44] p-6 shadow-sm space-y-6">
+          <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-4 border-b border-slate-200 dark:border-[#1E2D44] gap-4">
+            <div>
+              <div class="flex items-center space-x-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-indigo-600"></span>
+                <h3 class="text-base font-bold text-slate-900 dark:text-white flex items-center space-x-2">
+                  <span>Automated Paired Benchmark Sweep</span>
+                </h3>
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30">Paired Matrix</span>
+              </div>
+              <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Executes back-to-back TCP and UDP trials under identical network conditions for comparative evaluation.</p>
+            </div>
+            <button id="runPairedBtn" onclick="runPairedBenchmarkSweep()" class="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold text-xs uppercase tracking-wider rounded-lg shadow-sm flex items-center space-x-2 transition disabled:opacity-50">
+              <i data-lucide="play" class="w-4 h-4"></i>
+              <span>Execute Paired Trial</span>
+            </button>
+          </div>
+
+          <!-- Comparative KPI Cards (Latest Paired Run) -->
+          <div id="pairedResultsContainer" class="hidden space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <!-- TCP Card -->
+              <div class="bg-blue-50/50 rounded-xl border-2 border-blue-200 p-5 relative overflow-hidden">
+                <div class="absolute top-0 right-0 bg-blue-600 text-white text-[10px] font-bold px-3 py-1 rounded-bl-lg">
+                  TCP STREAM
+                </div>
+                <h4 class="text-base font-bold text-blue-900 mb-4">TCP (Transmission Control Protocol)</h4>
+                <div class="grid grid-cols-2 gap-3 text-xs">
+                  <div class="bg-white p-3 rounded-lg border border-blue-100 shadow-sm">
+                    <span class="text-[10px] text-slate-500 block">Throughput / Goodput</span>
+                    <span id="tcpPairThroughput" class="font-bold text-slate-900 font-mono">-</span>
+                  </div>
+                  <div class="bg-white p-3 rounded-lg border border-blue-100 shadow-sm">
+                    <span class="text-[10px] text-slate-500 block">Mean Transit Delay</span>
+                    <span id="tcpPairLatency" class="font-bold text-slate-900 font-mono">-</span>
+                  </div>
+                  <div class="bg-white p-3 rounded-lg border border-blue-100 shadow-sm">
+                    <span class="text-[10px] text-slate-500 block">Frame Delivery %</span>
+                    <span id="tcpPairFdr" class="font-bold text-emerald-600 font-mono">-</span>
+                  </div>
+                  <div class="bg-white p-3 rounded-lg border border-blue-100 shadow-sm">
+                    <span class="text-[10px] text-slate-500 block">Stalls</span>
+                    <span id="tcpPairStalls" class="font-bold text-amber-600 font-mono">-</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- UDP Card -->
+              <div class="bg-rose-50/50 rounded-xl border-2 border-rose-200 p-5 relative overflow-hidden">
+                <div class="absolute top-0 right-0 bg-rose-600 text-white text-[10px] font-bold px-3 py-1 rounded-bl-lg">
+                  UDP DATAGRAM
+                </div>
+                <h4 class="text-base font-bold text-rose-900 mb-4">UDP (User Datagram Protocol)</h4>
+                <div class="grid grid-cols-2 gap-3 text-xs">
+                  <div class="bg-white p-3 rounded-lg border border-rose-100 shadow-sm">
+                    <span class="text-[10px] text-slate-500 block">Throughput / Goodput</span>
+                    <span id="udpPairThroughput" class="font-bold text-slate-900 font-mono">-</span>
+                  </div>
+                  <div class="bg-white p-3 rounded-lg border border-rose-100 shadow-sm">
+                    <span class="text-[10px] text-slate-500 block">Mean Transit Delay</span>
+                    <span id="udpPairLatency" class="font-bold text-slate-900 font-mono">-</span>
+                  </div>
+                  <div class="bg-white p-3 rounded-lg border border-rose-100 shadow-sm">
+                    <span class="text-[10px] text-slate-500 block">Frame Delivery %</span>
+                    <span id="udpPairFdr" class="font-bold text-emerald-600 font-mono">-</span>
+                  </div>
+                  <div class="bg-white p-3 rounded-lg border border-rose-100 shadow-sm">
+                    <span class="text-[10px] text-slate-500 block">Packet Loss Rate</span>
+                    <span id="udpPairLoss" class="font-bold text-rose-600 font-mono">-</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Publication Figures Gallery -->
+        <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-4">
+          <div class="flex items-center justify-between pb-4 border-b border-slate-200">
+            <div>
+              <h3 class="text-base font-bold text-slate-900 flex items-center space-x-2">
+                <i data-lucide="image" class="w-5 h-5 text-indigo-600"></i>
+                <span>Publication-Grade Comparative Plots</span>
+              </h3>
+              <p class="text-xs text-slate-500 mt-0.5">High-resolution scientific figures generated from master benchmark data.</p>
+            </div>
+            <button id="btnGeneratePlots" onclick="generatePlots()" class="px-3.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg border border-indigo-200 text-xs font-semibold flex items-center space-x-1.5 transition">
+              <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+              <span>Re-render Figures</span>
+            </button>
+          </div>
+          <div id="plotsGallery" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="col-span-full py-8 text-center text-slate-400 space-y-2">
+              <i data-lucide="loader-2" class="w-6 h-6 mx-auto animate-spin text-indigo-500"></i>
+              <p class="text-xs text-slate-500">Loading publication figures...</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Master Results History Table (Light Theme) -->
+        <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-4">
+          <div class="flex items-center justify-between pb-3 border-b border-slate-200">
+            <div>
+              <h3 class="text-base font-bold text-slate-900 flex items-center space-x-2">
+                <i data-lucide="database" class="w-5 h-5 text-blue-600"></i>
+                <span>Master Benchmark Results Archive</span>
+              </h3>
+              <p class="text-xs text-slate-500 mt-0.5">Recorded experimental trials from <code class="font-mono text-blue-600">master_experiment_results.csv</code></p>
+            </div>
+          </div>
+          <div class="light-scroll-wrapper">
+            <table class="w-full text-left text-xs text-slate-700">
+              <thead class="bg-slate-100 text-slate-600 uppercase font-semibold text-[10px] border-b border-slate-200">
+                <tr>
+                  <th class="p-3">Scenario</th>
+                  <th class="p-3">Protocol</th>
+                  <th class="p-3">Latency</th>
+                  <th class="p-3">Loss</th>
+                  <th class="p-3">Bandwidth</th>
+                  <th class="p-3">Throughput</th>
+                  <th class="p-3">Delay</th>
+                  <th class="p-3">RFC Jitter</th>
+                  <th class="p-3">Frame Deliv %</th>
+                  <th class="p-3">Stalls</th>
+                </tr>
+              </thead>
+              <tbody id="historyTableBody" class="divide-y divide-slate-200 font-mono">
+                <tr>
+                  <td colspan="10" class="p-4 text-center text-slate-400 font-sans">Loading benchmark history...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </section>
+
+    </main>
+
+  </div>
+
+  <!-- ================================================================= -->
+  <!-- MODAL: LAN & MEDIA DIAGNOSTICS -->
+  <!-- ================================================================= -->
+  <div id="diagnosticsModal" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-[#111827] rounded-2xl border border-[#1E2D44] w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col shadow-2xl">
+      <div class="p-4 border-b border-[#1E2D44] flex items-center justify-between">
+        <div class="flex items-center space-x-2">
+          <i data-lucide="activity" class="w-5 h-5 text-cyan-400"></i>
+          <h3 class="text-sm font-bold text-white">Media Library & LAN Playback Diagnostics</h3>
+        </div>
+        <button onclick="toggleDiagnosticsModal()" class="p-1.5 hover:bg-slate-800 text-slate-400 hover:text-slate-200 rounded-lg transition">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+      <div class="p-5 overflow-y-auto space-y-4 text-xs text-slate-300" id="diagnosticsModalBody">
+        <div class="animate-pulse text-slate-400">Loading diagnostics from backend...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================================================================= -->
+  <!-- APPLICATION LOGIC SCRIPT -->
+  <!-- ================================================================= -->
+  <script>
+    // Global Application State
+    let currentTab = 'overview';
+    let selectedProtocol = 'TCP';
+    let selectedMediaMode = 'video';
+    let micMediaStream = null;
+    let micAudioContext = null;
+    let micProcessorNode = null;
+    let isLiveAudioMuted = false;
+    let mediaCatalog = [];
+    let currentWatchVideo = null;
+    let sseEventSource = null;
+    let liveChartInst = null;
+    let activeStreamInterval = null;
+
+    // Impairment Presets
+    const presets = {
+      "IDEAL": { latency: 0, loss: 0, bw: 0, jitter: 0 },
+      "FIBER_EXCELLENT": { latency: 5, loss: 0, bw: 20, jitter: 1 },
+      "CABLE_GOOD": { latency: 25, loss: 0.5, bw: 15, jitter: 5 },
+      "MOBILE_4G": { latency: 45, loss: 2, bw: 8, jitter: 15 },
+      "CONGESTED_WIFI": { latency: 80, loss: 5, bw: 3, jitter: 30 },
+      "POOR_CELLULAR_3G": { latency: 150, loss: 8, bw: 1.5, jitter: 45 },
+      "SATELLITE_GEO": { latency: 300, loss: 3, bw: 4, jitter: 20 },
+      "SEVERE_DEGRADATION": { latency: 250, loss: 15, bw: 1, jitter: 60 },
+    };
+
+    // -------------------------------------------------------------
+    // Tab Navigation & Dynamic Hybrid Theming
+    // -------------------------------------------------------------
+    function switchTab(tab) {
+      currentTab = tab;
+
+      // Section Containers
+      const secOverview = document.getElementById('sectionOverview');
+      const secExp = document.getElementById('sectionExperiment');
+      const secLive = document.getElementById('sectionLive');
+      const secLib = document.getElementById('sectionLibrary');
+      const secAna = document.getElementById('sectionAnalytics');
+
+      // Hide all sections
+      [secOverview, secExp, secLive, secLib, secAna].forEach(s => {
+        if (s) s.classList.add('hidden');
+      });
+
+      // Nav Buttons
+      const navOverview = document.getElementById('navBtnOverview');
+      const navExp = document.getElementById('navBtnExperiment');
+      const navLive = document.getElementById('navBtnLive');
+      const navLib = document.getElementById('navBtnLibrary');
+      const navAna = document.getElementById('navBtnAnalytics');
+
+      const allNavs = [navOverview, navExp, navLive, navLib, navAna];
+      const inactiveNav = 'w-full text-left px-3 py-2 rounded-lg text-xs font-semibold flex items-center space-x-2.5 transition text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#131D2E] hover:text-slate-900 dark:hover:text-white';
+      allNavs.forEach(n => { if (n) n.className = inactiveNav; });
+
+      // Shell Theming & Dynamic Top Bar
+      const mainShell = document.getElementById('mainShell');
+      const pageTitle = document.getElementById('pageTitle');
+
+      if (mainShell) {
+        mainShell.className = 'flex-1 flex flex-col min-w-0 bg-[#F8FAFC] dark:bg-[#0B0F17] transition-colors duration-200';
+      }
+
+      if (tab === 'overview') {
+        if (secOverview) secOverview.classList.remove('hidden');
+        if (navOverview) navOverview.className = 'w-full text-left px-3 py-2 rounded-lg text-xs font-semibold flex items-center space-x-2.5 transition bg-cyan-600 text-white shadow-md shadow-cyan-600/20 nav-tab-active';
+        if (pageTitle) pageTitle.innerHTML = `<i data-lucide="layout-dashboard" class="w-4 h-4 text-cyan-500 dark:text-cyan-400"></i><span class="text-slate-900 dark:text-white">StreamNet System Overview</span>`;
+      } else if (tab === 'experiment') {
+        if (secExp) secExp.classList.remove('hidden');
+        if (navExp) navExp.className = 'w-full text-left px-3 py-2 rounded-lg text-xs font-semibold flex items-center space-x-2.5 transition bg-teal-600 text-white shadow-md shadow-teal-600/20 nav-tab-active';
+        if (pageTitle) pageTitle.innerHTML = `<i data-lucide="sliders" class="w-4 h-4 text-teal-500 dark:text-teal-400"></i><span class="text-slate-900 dark:text-white">Live Experiment Configuration Lab</span>`;
+      } else if (tab === 'live') {
+        if (secLive) secLive.classList.remove('hidden');
+        if (navLive) navLive.className = 'w-full text-left px-3 py-2 rounded-lg text-xs font-semibold flex items-center space-x-2.5 transition bg-blue-600 text-white shadow-md shadow-blue-600/20 nav-tab-active';
+        if (pageTitle) pageTitle.innerHTML = `<i data-lucide="activity" class="w-4 h-4 text-blue-500 dark:text-blue-400"></i><span class="text-slate-900 dark:text-white">Real-Time Video Viewport & Telemetry</span>`;
+        initLiveChart();
+      } else if (tab === 'library') {
+        if (secLib) secLib.classList.remove('hidden');
+        if (navLib) navLib.className = 'w-full text-left px-3 py-2 rounded-lg text-xs font-semibold flex items-center space-x-2.5 transition bg-amber-600 text-white shadow-md shadow-amber-600/20 nav-tab-active';
+        if (pageTitle) pageTitle.innerHTML = `<i data-lucide="film" class="w-4 h-4 text-amber-500 dark:text-amber-400"></i><span class="text-slate-900 dark:text-white">Host Video Library & Media Catalogue</span>`;
+        loadCatalog();
+      } else if (tab === 'analytics') {
+        if (secAna) secAna.classList.remove('hidden');
+        if (navAna) navAna.className = 'w-full text-left px-3 py-2 rounded-lg text-xs font-semibold flex items-center space-x-2.5 transition bg-indigo-600 text-white shadow-md shadow-indigo-600/20 nav-tab-active';
+        if (pageTitle) pageTitle.innerHTML = `<i data-lucide="bar-chart-2" class="w-4 h-4 text-indigo-500 dark:text-indigo-400"></i><span class="text-slate-900 dark:text-white">Historical Benchmarks & Publication Figures</span>`;
+        refreshData();
+      }
+
+      // Close mobile drawer if open
+      const menu = document.getElementById('sidebarNavMenu');
+      if (menu && window.innerWidth < 768) {
+        menu.classList.add('hidden');
+      }
+
+      lucide.createIcons();
+    }
+
+    function toggleMobileNav() {
+      const menu = document.getElementById('sidebarNavMenu');
+      if (menu) {
+        menu.classList.toggle('hidden');
+      }
+    }
+
+    // -------------------------------------------------------------
+    // Media Library (Mini-YouTube)
+    // -------------------------------------------------------------
+    async function loadCatalog() {
+      const grid = document.getElementById('catalogGrid');
+      const emptyState = document.getElementById('catalogEmptyState');
+      const selectBox = document.getElementById('labVideoSource');
+
+      try {
+        const res = await fetch('/api/media/catalog');
+        if (!res.ok) throw new Error('Failed to load catalogue');
+        const data = await res.json();
+        mediaCatalog = data.videos || [];
+
+        if (data.media_dir) {
+          document.getElementById('mediaDirLabel').innerText = `Serving videos from: ${data.media_dir} (${data.count} items)`;
+        }
+
+        const countEl = document.getElementById('overviewMediaCount');
+        if (countEl) countEl.innerText = `${mediaCatalog.length} Files`;
+
+        // Fetch diagnostics in background to populate LAN access links
+        fetchLanQuickList();
+
+        // Populate Experiment Lab Video Dropdown
+        const currentSelectedVal = selectBox.value;
+        selectBox.innerHTML = '<option value="synthetic">Synthetic Stream (Bouncing Ball Generator - Benchmark Default)</option>';
+        mediaCatalog.forEach(v => {
+          const opt = document.createElement('option');
+          opt.value = v.id;
+          opt.innerText = `${v.title} (${v.filename}) ${v.width ? `[${v.width}x${v.height}]` : ''}`;
+          selectBox.appendChild(opt);
+        });
+        if (currentSelectedVal) selectBox.value = currentSelectedVal;
+
+        // Populate Experiment Lab Audio Dropdown
+        const audioSelectBox = document.getElementById('labAudioFileSelect');
+        if (audioSelectBox) {
+          const currentAudioVal = audioSelectBox.value;
+          const wavFiles = mediaCatalog.filter(v => v.filename && v.filename.toLowerCase().endsWith('.wav'));
+          if (wavFiles.length > 0) {
+            audioSelectBox.innerHTML = wavFiles.map(v => `<option value="${v.id}">${v.title} (${v.filename})</option>`).join('');
+            if (currentAudioVal) audioSelectBox.value = currentAudioVal;
+          } else {
+            audioSelectBox.innerHTML = '<option value="">No WAV files in library</option>';
+          }
+        }
+
+        renderCatalogCards(mediaCatalog);
+      } catch (err) {
+        console.error('Catalog load error:', err);
+        if (grid) {
+          grid.innerHTML = `
+            <div class="col-span-full py-12 text-center text-red-500 text-xs">
+              Failed to load media catalogue. Verify backend is running.
+            </div>
+          `;
+        }
+      }
+    }
+
+    async function fetchLanQuickList() {
+      try {
+        const res = await fetch('/api/media/diagnostic');
+        if (!res.ok) return;
+        const diag = await res.json();
+        const container = document.getElementById('lanQuickList');
+        const sidebarIp = document.getElementById('sidebarLanIp');
+        if (diag.host_lan_ips && diag.host_lan_ips.length > 0) {
+          if (sidebarIp) sidebarIp.innerText = diag.host_lan_ips[0];
+          if (container) {
+            container.innerHTML = `<span class="text-slate-500 text-[10px]">LAN Access:</span> ` +
+              diag.host_lan_ips.map(ip => `<a href="http://${ip}:8000" target="_blank" class="px-1.5 py-0.5 rounded bg-blue-50 border border-blue-200 text-blue-700 transition hover:underline">http://${ip}:8000</a>`).join(' ');
+          }
+        }
+      } catch (e) {
+        console.debug('Failed to load LAN diagnostics quick-list:', e);
+      }
+    }
+
+    function renderCatalogCards(videos) {
+      const grid = document.getElementById('catalogGrid');
+      const emptyState = document.getElementById('catalogEmptyState');
+
+      if (!videos || videos.length === 0) {
+        if (grid) grid.classList.add('hidden');
+        if (emptyState) emptyState.classList.remove('hidden');
+        return;
+      }
+
+      if (grid) grid.classList.remove('hidden');
+      if (emptyState) emptyState.classList.add('hidden');
+
+      grid.innerHTML = videos.map(v => {
+        const durStr = v.duration_seconds ? formatDuration(v.duration_seconds) : '--:--';
+        const sizeStr = formatFileSize(v.file_size_bytes);
+        const resBadge = (v.width && v.height) ? `${v.width}x${v.height}` : (v.filename.endsWith('.wav') ? 'Audio PCM' : 'Video');
+        const thumbSrc = v.has_thumbnail && v.thumbnail_url ? v.thumbnail_url : null;
+        const codecStr = v.codec || (v.filename.endsWith('.wav') ? 'WAV' : 'MP4');
+        const isCompat = v.is_browser_compatible !== false;
+
+        const codecBadge = isCompat
+          ? `<span class="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-200 text-[9px] font-semibold">${codecStr}</span>`
+          : `<span title="Incompatible browser codec" class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200 text-[9px] font-bold">⚠️ ${codecStr}</span>`;
+
+        const thumbHtml = thumbSrc
+          ? `<img src="${thumbSrc}" alt="${v.title}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">`
+          : `<div class="w-full h-full bg-slate-100 flex items-center justify-center text-slate-400">
+               <i data-lucide="${v.filename.endsWith('.wav') ? 'music' : 'play-circle'}" class="w-10 h-10 text-slate-300"></i>
+             </div>`;
+
+        return `
+          <div class="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md hover:border-blue-400/60 transition group flex flex-col">
+            <!-- Thumbnail Viewport -->
+            <div class="relative aspect-video bg-slate-900 overflow-hidden cursor-pointer" onclick="openWatchPanel('${v.id}')">
+              ${thumbHtml}
+              <!-- Duration Badge -->
+              <span class="absolute bottom-2 right-2 px-1.5 py-0.5 rounded bg-black/80 text-[10px] font-mono font-bold text-white">
+                ${durStr}
+              </span>
+              <!-- Resolution Badge -->
+              <span class="absolute top-2 left-2 px-1.5 py-0.5 rounded bg-black/60 backdrop-blur text-[9px] font-semibold text-slate-200">
+                ${resBadge}
+              </span>
+              <!-- Codec Tag Badge -->
+              <span class="absolute top-2 right-2 backdrop-blur">
+                ${codecBadge}
+              </span>
+            </div>
+
+            <!-- Card Meta -->
+            <div class="p-4 flex-1 flex flex-col justify-between space-y-3">
+              <div>
+                <h4 class="text-xs font-bold text-slate-900 line-clamp-1 group-hover:text-blue-600 transition cursor-pointer" onclick="openWatchPanel('${v.id}')">
+                  ${v.title}
+                </h4>
+                <div class="flex items-center space-x-2 text-[10px] text-slate-500 mt-1">
+                  <span class="truncate max-w-[140px]" title="${v.relative_path || v.filename}">${v.relative_path || v.filename}</span>
+                  <span>•</span>
+                  <span>${sizeStr}</span>
+                </div>
+              </div>
+
+              <!-- Quick Actions -->
+              <div class="flex items-center space-x-2 pt-2 border-t border-slate-100">
+                <button onclick="openWatchPanel('${v.id}')" class="flex-1 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold rounded-lg flex items-center justify-center space-x-1 transition">
+                  <i data-lucide="play" class="w-3.5 h-3.5 text-blue-600"></i>
+                  <span>Watch</span>
+                </button>
+                <button onclick="sendToExperiment('${v.id}')" title="Test in Experiment Lab" class="py-1.5 px-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 text-[11px] font-semibold rounded-lg border border-blue-200 flex items-center justify-center transition">
+                  <i data-lucide="sliders" class="w-3.5 h-3.5"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      lucide.createIcons();
+    }
+
+    function filterCatalog() {
+      const q = document.getElementById('catalogSearch').value.toLowerCase().trim();
+      if (!q) {
+        renderCatalogCards(mediaCatalog);
+        return;
+      }
+      const filtered = mediaCatalog.filter(v =>
+        v.title.toLowerCase().includes(q) ||
+        v.filename.toLowerCase().includes(q) ||
+        (v.relative_path && v.relative_path.toLowerCase().includes(q))
+      );
+      renderCatalogCards(filtered);
+    }
+
+    function openWatchPanel(videoId) {
+      const video = mediaCatalog.find(v => v.id === videoId);
+      if (!video) return;
+
+      currentWatchVideo = video;
+      const watchPanel = document.getElementById('watchPanel');
+      const player = document.getElementById('html5Player');
+
+      // Clear previous error and codec warning states
+      document.getElementById('playerErrorBanner').classList.add('hidden');
+      const codecWarning = document.getElementById('playerCodecWarning');
+      if (video.is_browser_compatible === false) {
+        codecWarning.classList.remove('hidden');
+        document.getElementById('playerCodecWarningText').innerText = video.codec_notice ||
+          `Video encoded with '${video.codec || 'MPEG-4'}'. Browsers require H.264 (avc1) or WebM (vp8/vp9) for native HTML5 video playback.`;
+      } else {
+        codecWarning.classList.add('hidden');
+      }
+
+      player.onerror = () => {
+        const err = player.error;
+        let title = 'Video Playback Error';
+        let msg = 'Failed to load or stream video.';
+        let remedy = '';
+
+        if (err) {
+          if (err.code === 4) {
+            title = 'Codec Unsupported (MEDIA_ERR_SRC_NOT_SUPPORTED)';
+            msg = `Browser rejected video stream: codec '${video.codec || 'MPEG-4'}' is not natively supported by HTML5 video decoders. Modern Chrome, Edge, and Safari require H.264 (avc1) or WebM (vp8/vp9).`;
+            remedy = `Transcode to browser-compatible H.264 with ffmpeg:\nffmpeg -i "${video.filename}" -c:v libx264 -pix_fmt yuv420p "h264_${video.filename}"`;
+          } else if (err.code === 2) {
+            title = 'Network Connection Interrupted (MEDIA_ERR_NETWORK)';
+            msg = 'A network error interrupted video transfer. Check connection between physical devices.';
+            remedy = 'Verify Wi-Fi connectivity and confirm Windows Firewall allows inbound connections on port 8000.';
+          } else if (err.code === 3) {
+            title = 'Decoding Failure (MEDIA_ERR_DECODE)';
+            msg = 'Browser video decoder encountered an unrecoverable decoding error.';
+            remedy = `Re-encode video with baseline profile:\nffmpeg -i "${video.filename}" -c:v libx264 -profile:v baseline "safe_${video.filename}"`;
+          }
+        }
+
+        document.getElementById('playerErrorTitle').innerText = title;
+        document.getElementById('playerErrorMessage').innerText = msg;
+        const remedyEl = document.getElementById('playerErrorRemedy');
+        if (remedy) {
+          remedyEl.innerText = remedy;
+          remedyEl.classList.remove('hidden');
+        } else {
+          remedyEl.classList.add('hidden');
+        }
+        document.getElementById('playerErrorBanner').classList.remove('hidden');
+        lucide.createIcons();
+      };
+
+      document.getElementById('watchTitle').innerText = video.title;
+      const sizeStr = formatFileSize(video.file_size_bytes);
+      const durStr = video.duration_seconds ? `${video.duration_seconds}s` : 'Unknown';
+      const resStr = (video.width && video.height) ? `${video.width}x${video.height} @ ${video.fps || 30} FPS` : 'Standard';
+      const codecLabel = video.codec ? ` • Codec: ${video.codec}` : '';
+      document.getElementById('watchMeta').innerText = `${video.relative_path || video.filename} • ${resStr} • ${sizeStr} • Duration: ${durStr}${codecLabel}`;
+
+      // Set video source to seekable byte-range HTTP stream URL
+      player.src = video.stream_url;
+      if (video.has_thumbnail && video.thumbnail_url) {
+        player.poster = video.thumbnail_url;
+      } else {
+        player.removeAttribute('poster');
+      }
+
+      watchPanel.classList.remove('hidden');
+      watchPanel.scrollIntoView({ behavior: 'smooth' });
+      player.play().catch(e => console.log('Autoplay prevented:', e));
+    }
+
+    function closeWatchPanel() {
+      const watchPanel = document.getElementById('watchPanel');
+      const player = document.getElementById('html5Player');
+      player.onerror = null;
+      player.pause();
+      player.src = '';
+      document.getElementById('playerErrorBanner').classList.add('hidden');
+      document.getElementById('playerCodecWarning').classList.add('hidden');
+      watchPanel.classList.add('hidden');
+      currentWatchVideo = null;
+    }
+
+    function launchWatchVideoInLab() {
+      if (!currentWatchVideo) return;
+      sendToExperiment(currentWatchVideo.id);
+    }
+
+    function copyCurrentStreamUrl() {
+      if (!currentWatchVideo) return;
+      const fullUrl = window.location.origin + currentWatchVideo.stream_url;
+      navigator.clipboard.writeText(fullUrl).then(() => {
+        alert(`Stream URL copied to clipboard:\n${fullUrl}`);
+      });
+    }
+
+    function sendToExperiment(videoId) {
+      switchTab('experiment');
+      const selectBox = document.getElementById('labVideoSource');
+      if (selectBox) selectBox.value = videoId;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    async function toggleDiagnosticsModal() {
+      const modal = document.getElementById('diagnosticsModal');
+      const body = document.getElementById('diagnosticsModalBody');
+      const isOpening = modal.classList.contains('hidden');
+
+      if (isOpening) {
+        modal.classList.remove('hidden');
+        body.innerHTML = '<div class="py-6 text-center text-slate-400">Querying media subsystem and network interfaces...</div>';
+        try {
+          const res = await fetch('/api/media/diagnostic');
+          const d = await res.json();
+          renderDiagnosticsModalContent(d);
+        } catch (err) {
+          body.innerHTML = `<div class="p-4 bg-red-500/10 text-red-300 rounded-lg">Failed to retrieve diagnostics: ${err}</div>`;
+        }
+      } else {
+        modal.classList.add('hidden');
+      }
+    }
+
+    function renderDiagnosticsModalContent(d) {
+      const body = document.getElementById('diagnosticsModalBody');
+      const ipBadges = (d.host_lan_ips || []).map(ip => `
+        <div class="p-2.5 rounded-lg bg-slate-800/90 border border-slate-700 flex items-center justify-between">
+          <div>
+            <span class="text-slate-400 text-[10px] block">Local IPv4 Address</span>
+            <span class="font-mono text-cyan-300 font-bold">${ip}</span>
+          </div>
+          <a href="http://${ip}:8000" target="_blank" class="px-2.5 py-1 bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 rounded text-[11px] font-semibold border border-cyan-500/30 transition">
+            Open http://${ip}:8000
+          </a>
+        </div>
+      `).join('');
+
+      body.innerHTML = `
+        <div class="space-y-2">
+          <h4 class="font-bold text-white flex items-center space-x-1.5 text-xs">
+            <i data-lucide="wifi" class="w-4 h-4 text-cyan-400"></i>
+            <span>LAN Network Interfaces & URLs</span>
+          </h4>
+          <p class="text-[11px] text-slate-400">Share this URL with devices on the same Wi-Fi network:</p>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-1">
+            ${ipBadges || '<span class="text-slate-400">No external LAN interfaces found</span>'}
+          </div>
+        </div>
+
+        <div class="space-y-1.5 pt-3 border-t border-slate-800">
+          <h4 class="font-bold text-white text-xs">Media Directory Diagnostics</h4>
+          <div class="grid grid-cols-3 gap-2 font-mono text-[11px]">
+            <div class="p-2 rounded bg-slate-800/60 border border-slate-700/50">Scanned: <strong class="text-white">${d.total_scanned_files}</strong></div>
+            <div class="p-2 rounded bg-slate-800/60 border border-slate-700/50">Discovered: <strong class="text-emerald-400">${d.catalog_count}</strong></div>
+            <div class="p-2 rounded bg-slate-800/60 border border-slate-700/50">Ignored: <strong class="text-amber-400">${d.ignored_count}</strong></div>
+          </div>
+        </div>
+      `;
+      lucide.createIcons();
+    }
+
+    // -------------------------------------------------------------
+    // Live Experiment Lab Controls
+    // -------------------------------------------------------------
+    function selectProtocol(proto) {
+      selectedProtocol = proto;
+      const btnTCP = document.getElementById('protoBtnTCP');
+      const btnUDP = document.getElementById('protoBtnUDP');
+      const desc = document.getElementById('protoDesc');
+      const badge = document.getElementById('playerProtoBadge');
+      const sbBadge = document.getElementById('sidebarProtocolBadge');
+      const ovEngine = document.getElementById('overviewTransportEngine');
+
+      if (proto === 'TCP') {
+        btnTCP.className = 'py-2.5 px-4 rounded-lg border-2 border-blue-500 bg-blue-500/20 text-blue-300 font-bold text-xs flex items-center justify-center space-x-2 transition';
+        btnUDP.className = 'py-2.5 px-4 rounded-lg border border-slate-700 bg-[#162032] text-slate-400 font-bold text-xs flex items-center justify-center space-x-2 hover:border-red-500/50 transition';
+        desc.innerText = 'TCP uses binary framing with head-of-line blocking resilience testing.';
+        badge.innerText = 'TCP STREAM';
+        badge.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30';
+        if (sbBadge) { sbBadge.innerText = 'TCP'; sbBadge.className = 'font-mono font-bold text-blue-400'; }
+        if (ovEngine) ovEngine.innerText = 'TCP (Stream)';
+      } else {
+        btnTCP.className = 'py-2.5 px-4 rounded-lg border border-slate-700 bg-[#162032] text-slate-400 font-bold text-xs flex items-center justify-center space-x-2 hover:border-blue-500/50 transition';
+        btnUDP.className = 'py-2.5 px-4 rounded-lg border-2 border-red-500 bg-red-500/20 text-red-300 font-bold text-xs flex items-center justify-center space-x-2 transition';
+        desc.innerText = 'UDP uses 1400-byte fragmented datagram slices with application-layer reassembly.';
+        badge.innerText = 'UDP DATAGRAM';
+        badge.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-red-500/20 text-red-400 border border-red-500/30';
+        if (sbBadge) { sbBadge.innerText = 'UDP'; sbBadge.className = 'font-mono font-bold text-red-400'; }
+        if (ovEngine) ovEngine.innerText = 'UDP (Datagram)';
+      }
+    }
+
+    function updateLabSliderLabels() {
+      const lat = document.getElementById('labLatencyInput').value;
+      const loss = document.getElementById('labLossInput').value;
+      const bw = document.getElementById('labBwInput').value;
+      const jitter = document.getElementById('labJitterInput').value;
+
+      document.getElementById('labLatencyVal').innerText = `${lat} ms`;
+      document.getElementById('labLossVal').innerText = `${loss} %`;
+      document.getElementById('labBwVal').innerText = bw == 0 ? 'Unlimited' : `${bw} Mbps`;
+      document.getElementById('labJitterVal').innerText = `${jitter} ms`;
+    }
+
+    function applyLabPreset() {
+      const val = document.getElementById('labPresetSelect').value;
+      if (presets[val]) {
+        const p = presets[val];
+        document.getElementById('labLatencyInput').value = p.latency;
+        document.getElementById('labLossInput').value = p.loss;
+        document.getElementById('labBwInput').value = p.bw;
+        document.getElementById('labJitterInput').value = p.jitter;
+        updateLabSliderLabels();
+      }
+    }
+
+    function selectMediaMode(mode) {
+      selectedMediaMode = mode;
+      const btnVideo = document.getElementById('mediaModeVideo');
+      const btnAudio = document.getElementById('mediaModeAudio');
+      const btnAV = document.getElementById('mediaModeAV');
+      const audioConfig = document.getElementById('audioConfigPanel');
+      const statusBadge = document.getElementById('audioStatusBadge');
+      const statusText = document.getElementById('audioStatusText');
+
+      const activeClass = 'py-2 px-3 rounded-lg border-2 border-cyan-500 bg-cyan-500/20 text-cyan-300 font-bold text-xs flex items-center justify-center space-x-2 transition';
+      const inactiveClass = 'py-2 px-3 rounded-lg border border-slate-700 bg-[#162032] text-slate-400 font-bold text-xs flex items-center justify-center space-x-2 transition hover:border-slate-500';
+
+      if (btnVideo) btnVideo.className = mode === 'video' ? activeClass : inactiveClass;
+      if (btnAudio) btnAudio.className = mode === 'audio' ? activeClass : inactiveClass;
+      if (btnAV) btnAV.className = mode === 'audio_video' ? activeClass : inactiveClass;
+
+      if (mode === 'video') {
+        if (audioConfig) audioConfig.classList.add('hidden');
+        if (statusBadge) statusBadge.className = 'px-3 py-1.5 rounded-lg bg-[#111827] border border-slate-700 text-slate-300 text-[11px] font-medium flex items-center space-x-1.5 whitespace-nowrap';
+        if (statusText) statusText.innerText = 'Audio: Video transport evaluation only';
+      } else if (mode === 'audio') {
+        if (audioConfig) audioConfig.classList.remove('hidden');
+        if (statusBadge) statusBadge.className = 'px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[11px] font-medium flex items-center space-x-1.5 whitespace-nowrap';
+        if (statusText) statusText.innerText = 'Audio Only Transmission Active';
+      } else {
+        if (audioConfig) audioConfig.classList.remove('hidden');
+        if (statusBadge) statusBadge.className = 'px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-[11px] font-medium flex items-center space-x-1.5 whitespace-nowrap';
+        if (statusText) statusText.innerText = 'Synced Audio + Video Transmission Active';
+      }
+      lucide.createIcons();
+    }
+
+    function updateAudioSourceUI() {
+      const src = document.getElementById('labAudioSource').value;
+      const patternCol = document.getElementById('audioPatternCol');
+      const customCol = document.getElementById('audioCustomCol');
+      if (src === 'custom') {
+        if (patternCol) patternCol.classList.add('hidden');
+        if (customCol) customCol.classList.remove('hidden');
+      } else if (src === 'synthetic') {
+        if (patternCol) patternCol.classList.remove('hidden');
+        if (customCol) customCol.classList.add('hidden');
+      } else {
+        if (patternCol) patternCol.classList.add('hidden');
+        if (customCol) customCol.classList.add('hidden');
+      }
+    }
+
+    function toggleLiveAudioMute() {
+      const player = document.getElementById('liveAudioPlayer');
+      isLiveAudioMuted = !isLiveAudioMuted;
+      if (player) player.muted = isLiveAudioMuted;
+      const btnText = document.getElementById('liveAudioMuteText');
+      const btnIcon = document.getElementById('liveAudioMuteIcon');
+      if (btnText) btnText.innerText = isLiveAudioMuted ? 'Unmute' : 'Mute';
+      if (btnIcon) {
+        if (isLiveAudioMuted) {
+          btnIcon.setAttribute('data-lucide', 'volume-x');
+          btnIcon.classList.remove('text-emerald-400');
+          btnIcon.classList.add('text-amber-400');
+        } else {
+          btnIcon.setAttribute('data-lucide', 'volume-2');
+          btnIcon.classList.remove('text-amber-400');
+          btnIcon.classList.add('text-emerald-400');
+        }
+      }
+      lucide.createIcons();
+    }
+
+    function setLiveAudioVolume(val) {
+      const player = document.getElementById('liveAudioPlayer');
+      if (player) player.volume = parseFloat(val);
+    }
+
+    async function startMicCapture() {
+      try {
+        micMediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        micAudioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+        const source = micAudioContext.createMediaStreamSource(micMediaStream);
+        micProcessorNode = micAudioContext.createScriptProcessor(2048, 1, 1);
+
+        micProcessorNode.onaudioprocess = (e) => {
+          const inputData = e.inputBuffer.getChannelData(0);
+          const pcm16 = new Int16Array(inputData.length);
+          for (let i = 0; i < inputData.length; i++) {
+            const s = Math.max(-1, Math.min(1, inputData[i]));
+            pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+          }
+          fetch('/api/live/mic-upload', {
+            method: 'POST',
+            body: pcm16.buffer,
+            headers: { 'Content-Type': 'application/octet-stream' }
+          }).catch(() => {});
+        };
+
+        source.connect(micProcessorNode);
+        micProcessorNode.connect(micAudioContext.destination);
+      } catch (err) {
+        console.warn('Microphone access denied or error:', err);
+      }
+    }
+
+    function stopMicCapture() {
+      if (micProcessorNode) {
+        try { micProcessorNode.disconnect(); } catch (e) {}
+        micProcessorNode = null;
+      }
+      if (micAudioContext) {
+        try { micAudioContext.close(); } catch (e) {}
+        micAudioContext = null;
+      }
+      if (micMediaStream) {
+        try { micMediaStream.getTracks().forEach(t => t.stop()); } catch (e) {}
+        micMediaStream = null;
+      }
+    }
+
+    // -------------------------------------------------------------
+    // Live Session Management & SSE Telemetry
+    // -------------------------------------------------------------
+    async function startLiveStreamingSession() {
+      const startBtn = document.getElementById('startStreamBtn');
+      const stopBtn = document.getElementById('stopStreamBtn');
+      startBtn.disabled = true;
+
+      const videoSourceVal = document.getElementById('labVideoSource').value;
+      const isCustom = videoSourceVal !== 'synthetic';
+      const audioSourceVal = document.getElementById('labAudioSource').value;
+      const audioPatternVal = document.getElementById('labAudioPattern').value;
+      const audioFileVal = document.getElementById('labAudioFileSelect').value;
+
+      const payload = {
+        protocol: selectedProtocol,
+        media_mode: selectedMediaMode,
+        video_source_type: isCustom ? 'custom' : 'synthetic',
+        video_path: isCustom ? videoSourceVal : null,
+        audio_source_type: audioSourceVal,
+        audio_path: audioSourceVal === 'custom' ? (audioFileVal || null) : null,
+        audio_pattern: audioPatternVal,
+        total_frames: 150,
+        fps: 30,
+        width: 640,
+        height: 480,
+        jpeg_quality: 75,
+        latency_ms: parseFloat(document.getElementById('labLatencyInput').value),
+        loss_percent: parseFloat(document.getElementById('labLossInput').value),
+        bandwidth_mbps: parseFloat(document.getElementById('labBwInput').value) || null,
+        jitter_ms: parseFloat(document.getElementById('labJitterInput').value),
+      };
+
+      try {
+        const res = await fetch('/api/live/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) {
+          const errData = await res.json();
+          throw new Error(errData.detail || 'Failed to start session');
+        }
+
+        // Connect Video Viewport to MJPEG Stream if video enabled
+        const feedImg = document.getElementById('liveFeedImg');
+        const standby = document.getElementById('standbyScreen');
+        const bufBadge = document.getElementById('bufferStateBadge');
+        const audioPlayer = document.getElementById('liveAudioPlayer');
+        const audioStatus = document.getElementById('audioFeedStatus');
+        const audioKpiRow = document.getElementById('audioKpiRow');
+
+        if (selectedMediaMode === 'video' || selectedMediaMode === 'audio_video') {
+          feedImg.src = `/api/live/video-feed?t=${Date.now()}`;
+          feedImg.classList.remove('hidden');
+          standby.classList.add('hidden');
+          bufBadge.classList.remove('hidden');
+        } else {
+          feedImg.src = '';
+          feedImg.classList.add('hidden');
+          standby.classList.remove('hidden');
+          bufBadge.classList.add('hidden');
+        }
+
+        // Connect Live Audio Player if audio enabled
+        if (selectedMediaMode === 'audio' || selectedMediaMode === 'audio_video') {
+          if (audioKpiRow) audioKpiRow.classList.remove('hidden');
+          if (audioPlayer) {
+            audioPlayer.muted = isLiveAudioMuted;
+            audioPlayer.src = `/api/live/audio-feed?t=${Date.now()}`;
+            audioPlayer.play().catch(e => console.debug('Audio autoplay:', e));
+          }
+          if (audioStatus) {
+            audioStatus.innerText = 'PLAYING';
+            audioStatus.className = 'font-mono text-[10px] text-emerald-400 font-bold';
+          }
+          if (audioSourceVal === 'mic') {
+            startMicCapture();
+          }
+        } else {
+          if (audioKpiRow) audioKpiRow.classList.add('hidden');
+          if (audioPlayer) {
+            audioPlayer.pause();
+            audioPlayer.src = '';
+          }
+          if (audioStatus) {
+            audioStatus.innerText = 'STANDBY';
+            audioStatus.className = 'font-mono text-[10px] text-slate-400';
+          }
+        }
+
+        // Reset live chart for new session
+        if (liveChartInst) {
+          liveChartInst.data.labels = [];
+          liveChartInst.data.datasets[0].data = [];
+          liveChartInst.data.datasets[1].data = [];
+          liveChartInst.update('none');
+        }
+        const chartWrapper = document.getElementById('liveChartScrollWrapper');
+        if (chartWrapper) chartWrapper.scrollLeft = 0;
+        const chartContent = document.getElementById('liveChartContent');
+        if (chartContent) chartContent.style.width = '100%';
+        const ptsCounter = document.getElementById('chartPointsCount');
+        if (ptsCounter) ptsCounter.innerText = '0 pts';
+
+        // Update State Indicators
+        document.getElementById('sessionStateText').innerText = 'STREAMING';
+        document.getElementById('sessionStatusDot').style.backgroundColor = '#10B981';
+        document.getElementById('sidebarStatusText').innerText = 'STREAMING';
+        document.getElementById('sidebarStatusDot').style.backgroundColor = '#10B981';
+        document.getElementById('overviewPipelineState').innerText = 'STREAMING';
+        document.getElementById('overviewPipelineState').className = 'text-lg font-black text-emerald-400 font-mono animate-pulse';
+        document.getElementById('navLivePulseDot').className = 'w-2 h-2 rounded-full bg-emerald-400 animate-pulse';
+        stopBtn.disabled = false;
+
+        // Start SSE Telemetry Stream
+        connectTelemetryStream();
+
+      } catch (err) {
+        alert('Failed to start live streaming: ' + err.message);
+        startBtn.disabled = false;
+      }
+    }
+
+    async function stopLiveStreamingSession() {
+      const startBtn = document.getElementById('startStreamBtn');
+      const stopBtn = document.getElementById('stopStreamBtn');
+      stopBtn.disabled = true;
+
+      try {
+        await fetch('/api/live/stop', { method: 'POST' });
+      } catch (err) {
+        console.error('Stop request error:', err);
+      } finally {
+        if (sseEventSource) {
+          sseEventSource.close();
+          sseEventSource = null;
+        }
+
+        stopMicCapture();
+        const audioPlayer = document.getElementById('liveAudioPlayer');
+        if (audioPlayer) {
+          audioPlayer.pause();
+          audioPlayer.src = '';
+        }
+        const audioStatus = document.getElementById('audioFeedStatus');
+        if (audioStatus) {
+          audioStatus.innerText = 'STANDBY';
+          audioStatus.className = 'font-mono text-[10px] text-slate-400';
+        }
+        const audioBar = document.getElementById('audioLevelBar');
+        if (audioBar) audioBar.style.width = '0%';
+
+        const feedImg = document.getElementById('liveFeedImg');
+        const standby = document.getElementById('standbyScreen');
+        const bufBadge = document.getElementById('bufferStateBadge');
+
+        feedImg.src = '';
+        feedImg.classList.add('hidden');
+        standby.classList.remove('hidden');
+        bufBadge.classList.add('hidden');
+
+        document.getElementById('sessionStateText').innerText = 'STOPPED';
+        document.getElementById('sessionStatusDot').style.backgroundColor = '#EF4444';
+        document.getElementById('sidebarStatusText').innerText = 'STOPPED';
+        document.getElementById('sidebarStatusDot').style.backgroundColor = '#EF4444';
+        document.getElementById('overviewPipelineState').innerText = 'STOPPED';
+        document.getElementById('overviewPipelineState').className = 'text-lg font-black text-slate-400 font-mono';
+        document.getElementById('navLivePulseDot').className = 'w-2 h-2 rounded-full bg-slate-600';
+        startBtn.disabled = false;
+      }
+    }
+
+    function connectTelemetryStream() {
+      if (sseEventSource) {
+        sseEventSource.close();
+      }
+
+      sseEventSource = new EventSource('/api/live/telemetry');
+      sseEventSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          updateTelemetryUI(data);
+        } catch (e) {
+          console.error('Telemetry parse error:', e);
+        }
+      };
+      sseEventSource.onerror = () => {};
+    }
+
+    function updateTelemetryUI(data) {
+      if (!data || data.session_state === 'IDLE') return;
+
+      document.getElementById('kpiThroughput').innerText = `${Number(data.throughput_mbps || 0).toFixed(2)} Mbps`;
+      document.getElementById('kpiGoodput').innerText = `${Number(data.goodput_mbps || 0).toFixed(2)} Mbps`;
+      document.getElementById('kpiLatency').innerText = `${Number(data.latency_mean_ms || 0).toFixed(1)} ms`;
+      document.getElementById('kpiJitter').innerText = `${Number(data.rfc3550_jitter_ms || 0).toFixed(2)} ms`;
+      document.getElementById('kpiFdr').innerText = `${Number(data.frame_delivery_ratio_percent || 100).toFixed(1)}%`;
+      document.getElementById('kpiLoss').innerText = `${Number(data.packet_loss_rate_percent || 0).toFixed(1)}%`;
+      document.getElementById('kpiStalls').innerText = `${data.rebuffering_events || 0} (${Number(data.total_stall_seconds || 0).toFixed(1)}s)`;
+      document.getElementById('kpiBufferDepth').innerText = `${Number(data.buffer_depth_ms || 0).toFixed(0)} ms`;
+
+      document.getElementById('liveFpsVal').innerText = Number(data.current_fps || 0).toFixed(1);
+      if (data.buffer_state) {
+        document.getElementById('bufferStateVal').innerText = data.buffer_state;
+      }
+
+      document.getElementById('bridgeDelivered').innerText = data.bridge_frames_delivered || 0;
+      document.getElementById('bridgeDropped').innerText = data.bridge_frames_dropped || 0;
+      document.getElementById('bridgeQueue').innerText = data.bridge_queue_size || 0;
+
+      // Update Chart Point
+      if (liveChartInst) {
+        const timeLabel = new Date().toLocaleTimeString().split(' ')[0];
+        liveChartInst.data.labels.push(timeLabel);
+        liveChartInst.data.datasets[0].data.push(data.throughput_mbps || 0);
+        liveChartInst.data.datasets[1].data.push(data.goodput_mbps || 0);
+
+        if (liveChartInst.data.labels.length > 1500) {
+          liveChartInst.data.labels.shift();
+          liveChartInst.data.datasets[0].data.shift();
+          liveChartInst.data.datasets[1].data.shift();
+        }
+
+        const pointCount = liveChartInst.data.labels.length;
+        const ptsBadge = document.getElementById('chartPointsCount');
+        if (ptsBadge) ptsBadge.innerText = `${pointCount} pts`;
+
+        const wrapper = document.getElementById('liveChartScrollWrapper');
+        const content = document.getElementById('liveChartContent');
+        if (wrapper && content) {
+          const minWidthPerPoint = 20;
+          const requiredWidth = pointCount * minWidthPerPoint;
+          const isNearRight = (wrapper.scrollLeft + wrapper.clientWidth) >= (wrapper.scrollWidth - 30);
+
+          if (requiredWidth > wrapper.clientWidth) {
+            content.style.width = `${requiredWidth}px`;
+            liveChartInst.resize();
+            if (isNearRight) {
+              wrapper.scrollLeft = wrapper.scrollWidth;
+            }
+          } else {
+            content.style.width = '100%';
+          }
+        }
+
+        liveChartInst.update('none');
+      }
+
+      // Audio Telemetry & VU Meter
+      if (data.audio && data.audio.enabled) {
+        const kpiRow = document.getElementById('audioKpiRow');
+        if (kpiRow) kpiRow.classList.remove('hidden');
+        const br = document.getElementById('kpiAudioBitrate');
+        if (br) br.innerText = `${Number(data.audio.bitrate_kbps || 0).toFixed(1)} kbps`;
+        const buf = document.getElementById('kpiAudioBuffer');
+        if (buf) buf.innerText = `${Number(data.audio.buffer_depth_ms || 0).toFixed(1)} ms`;
+        const und = document.getElementById('kpiAudioUnderruns');
+        if (und) und.innerText = `${data.audio.underruns || 0}`;
+        const loss = document.getElementById('kpiAudioLoss');
+        if (loss) loss.innerText = `${Number(data.audio.loss_percent || 0).toFixed(1)}%`;
+
+        const audioBar = document.getElementById('audioLevelBar');
+        if (audioBar) {
+          const pct = data.audio.bitrate_kbps > 0 ? Math.min(100, Math.max(30, (data.audio.bitrate_kbps / 256.0) * 100)) : 0;
+          audioBar.style.width = `${pct}%`;
+        }
+      } else {
+        const kpiRow = document.getElementById('audioKpiRow');
+        if (kpiRow && selectedMediaMode === 'video') kpiRow.classList.add('hidden');
+      }
+
+      if (data.session_state === 'STOPPED') {
+        document.getElementById('sessionStateText').innerText = 'FINISHED';
+        document.getElementById('sessionStatusDot').style.backgroundColor = '#3B82F6';
+        document.getElementById('sidebarStatusText').innerText = 'FINISHED';
+        document.getElementById('sidebarStatusDot').style.backgroundColor = '#3B82F6';
+        document.getElementById('overviewPipelineState').innerText = 'FINISHED';
+        document.getElementById('overviewPipelineState').className = 'text-lg font-black text-blue-400 font-mono';
+        document.getElementById('navLivePulseDot').className = 'w-2 h-2 rounded-full bg-slate-600';
+        document.getElementById('startStreamBtn').disabled = false;
+        document.getElementById('stopStreamBtn').disabled = true;
+
+        const audioStatus = document.getElementById('audioFeedStatus');
+        if (audioStatus) {
+          audioStatus.innerText = 'FINISHED';
+          audioStatus.className = 'font-mono text-[10px] text-blue-400 font-bold';
+        }
+        const audioBar = document.getElementById('audioLevelBar');
+        if (audioBar) audioBar.style.width = '0%';
+      }
+    }
+
+    function initLiveChart() {
+      if (liveChartInst) return;
+      const canvas = document.getElementById('liveChart');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const isDark = document.documentElement.classList.contains('dark');
+      const gridColor = isDark ? 'rgba(255, 255, 255, 0.07)' : 'rgba(72, 63, 52, 0.12)';
+      const tickColor = isDark ? '#94A3B8' : '#483F34';
+      const legendColor = isDark ? '#CBD5E1' : '#16110D';
+
+      liveChartInst = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: [],
+          datasets: [
+            {
+              label: 'Raw Throughput (Mbps)',
+              data: [],
+              borderColor: isDark ? '#3B82F6' : '#1D4ED8',
+              backgroundColor: isDark ? 'rgba(59, 130, 246, 0.15)' : 'rgba(29, 78, 216, 0.08)',
+              tension: 0.3,
+              fill: true,
+              pointRadius: 0
+            },
+            {
+              label: 'Goodput (Mbps)',
+              data: [],
+              borderColor: isDark ? '#06B6D4' : '#0F766E',
+              backgroundColor: isDark ? 'rgba(6, 182, 212, 0.15)' : 'rgba(15, 118, 110, 0.08)',
+              tension: 0.3,
+              fill: true,
+              pointRadius: 0
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: false,
+          scales: {
+            x: {
+              display: true,
+              grid: { color: gridColor },
+              ticks: { color: tickColor, font: { size: 9, family: 'monospace' }, maxTicksLimit: 12 }
+            },
+            y: {
+              beginAtZero: true,
+              grid: { color: gridColor },
+              ticks: { color: tickColor, font: { size: 9, family: 'monospace' } }
+            }
+          },
+          plugins: {
+            legend: {
+              position: 'top',
+              labels: { color: legendColor, boxWidth: 10, font: { size: 10 } }
+            }
+          }
+        }
+      });
+
+      const wrapper = document.getElementById('liveChartScrollWrapper');
+      attachHorizontalScroll(wrapper);
+    }
+
+    function updateChartTheme(isDark) {
+      if (!liveChartInst) return;
+      const gridColor = isDark ? 'rgba(255, 255, 255, 0.07)' : 'rgba(72, 63, 52, 0.12)';
+      const tickColor = isDark ? '#94A3B8' : '#483F34';
+      const legendColor = isDark ? '#CBD5E1' : '#16110D';
+
+      if (liveChartInst.options && liveChartInst.options.scales) {
+        if (liveChartInst.options.scales.x) {
+          liveChartInst.options.scales.x.grid.color = gridColor;
+          liveChartInst.options.scales.x.ticks.color = tickColor;
+        }
+        if (liveChartInst.options.scales.y) {
+          liveChartInst.options.scales.y.grid.color = gridColor;
+          liveChartInst.options.scales.y.ticks.color = tickColor;
+        }
+      }
+      if (liveChartInst.options && liveChartInst.options.plugins && liveChartInst.options.plugins.legend) {
+        liveChartInst.options.plugins.legend.labels.color = legendColor;
+      }
+      if (liveChartInst.data && liveChartInst.data.datasets) {
+        if (liveChartInst.data.datasets[0]) {
+          liveChartInst.data.datasets[0].borderColor = isDark ? '#3B82F6' : '#1D4ED8';
+          liveChartInst.data.datasets[0].backgroundColor = isDark ? 'rgba(59, 130, 246, 0.15)' : 'rgba(29, 78, 216, 0.08)';
+        }
+        if (liveChartInst.data.datasets[1]) {
+          liveChartInst.data.datasets[1].borderColor = isDark ? '#06B6D4' : '#0F766E';
+          liveChartInst.data.datasets[1].backgroundColor = isDark ? 'rgba(6, 182, 212, 0.15)' : 'rgba(15, 118, 110, 0.08)';
+        }
+      }
+      liveChartInst.update('none');
+    }
+
+    function resetChartScroll() {
+      const wrapper = document.getElementById('liveChartScrollWrapper');
+      if (wrapper) {
+        wrapper.scrollTo({ left: wrapper.scrollWidth, behavior: 'smooth' });
+      }
+    }
+
+    function attachHorizontalScroll(el) {
+      if (!el || el._hScrollAttached) return;
+      el._hScrollAttached = true;
+      el.addEventListener('wheel', (e) => {
+        if (el.scrollWidth > el.clientWidth && Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+          const canScrollLeft = el.scrollLeft > 0 && e.deltaY < 0;
+          const canScrollRight = el.scrollLeft < el.scrollWidth - el.clientWidth && e.deltaY > 0;
+          if (canScrollLeft || canScrollRight) {
+            e.preventDefault();
+            el.scrollLeft += e.deltaY;
+          }
+        }
+      }, { passive: false });
+    }
+
+    // -------------------------------------------------------------
+    // Benchmark Matrix & Historical Results
+    // -------------------------------------------------------------
+    async function runPairedBenchmarkSweep() {
+      const runBtn = document.getElementById('runPairedBtn');
+      runBtn.disabled = true;
+      runBtn.innerHTML = `<span class="inline-block animate-spin mr-2">⟳</span> Running Paired Sweep...`;
+
+      const reqBody = {
+        scenario_name: document.getElementById('labPresetSelect').selectedOptions[0].text,
+        latency_ms: parseFloat(document.getElementById('labLatencyInput').value),
+        loss_percent: parseFloat(document.getElementById('labLossInput').value),
+        bandwidth_mbps: parseFloat(document.getElementById('labBwInput').value) || null,
+        jitter_ms: parseFloat(document.getElementById('labJitterInput').value),
+        total_frames: 90,
+        fps: 30,
+        jpeg_quality: 70
+      };
+
+      try {
+        const res = await fetch('/api/run-scenario', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(reqBody)
+        });
+        const record = await res.json();
+        displayPairedResults(record);
+        refreshData();
+      } catch (err) {
+        alert('Benchmark execution failed: ' + err);
+      } finally {
+        runBtn.disabled = false;
+        runBtn.innerHTML = `<i data-lucide="play" class="w-4 h-4"></i><span>Execute Paired Trial</span>`;
+        lucide.createIcons();
+      }
+    }
+
+    function displayPairedResults(record) {
+      document.getElementById('pairedResultsContainer').classList.remove('hidden');
+      const tcp = record.tcp_results;
+      const udp = record.udp_results;
+
+      document.getElementById('tcpPairThroughput').innerText = `${tcp.throughput_mbps} / ${tcp.goodput_mbps} Mbps`;
+      document.getElementById('tcpPairLatency').innerText = `${tcp.latency_mean_ms} ms (p95: ${tcp.latency_p95_ms}ms)`;
+      document.getElementById('tcpPairFdr').innerText = `${tcp.frame_delivery_ratio_percent}%`;
+      document.getElementById('tcpPairStalls').innerText = `${tcp.rebuffering_events} (${tcp.total_stall_seconds}s)`;
+
+      document.getElementById('udpPairThroughput').innerText = `${udp.throughput_mbps} / ${udp.goodput_mbps} Mbps`;
+      document.getElementById('udpPairLatency').innerText = `${udp.latency_mean_ms} ms (Jitter: ${udp.rfc3550_jitter_ms}ms)`;
+      document.getElementById('udpPairFdr').innerText = `${udp.frame_delivery_ratio_percent}%`;
+      document.getElementById('udpPairLoss').innerText = `${udp.packet_loss_rate_percent}%`;
+    }
+
+    async function refreshData() {
+      try {
+        const res = await fetch('/api/experiments');
+        const data = await res.json();
+        const tbody = document.getElementById('historyTableBody');
+        tbody.innerHTML = '';
+
+        const countEl = document.getElementById('overviewRecordedCount');
+        if (countEl) countEl.innerText = `${data.length} Trials`;
+
+        if (!data || data.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="10" class="p-4 text-center text-slate-400 font-sans">No experiments recorded yet.</td></tr>';
+        } else {
+          data.slice().reverse().forEach(row => {
+            const isTCP = row.protocol === 'TCP';
+            const protoBadge = isTCP
+              ? '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-700 border border-blue-200">TCP</span>'
+              : '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700 border border-rose-200">UDP</span>';
+
+            const tr = document.createElement('tr');
+            tr.className = 'hover:bg-slate-50 dark:hover:bg-[#162132] transition';
+            tr.innerHTML = `
+              <td class="p-3 text-slate-900 dark:text-slate-100 font-semibold">${row.scenario_name || row.scenario_id}</td>
+              <td class="p-3">${protoBadge}</td>
+              <td class="p-3 text-slate-600 dark:text-slate-300">${row.latency_ms}</td>
+              <td class="p-3 text-slate-600 dark:text-slate-300">${row.loss_percent}%</td>
+              <td class="p-3 text-slate-600 dark:text-slate-300">${row.bandwidth_mbps > 0 ? row.bandwidth_mbps + ' Mbps' : 'Uncapped'}</td>
+              <td class="p-3 text-slate-900 dark:text-slate-100 font-bold">${row.throughput_mbps}</td>
+              <td class="p-3 text-slate-600 dark:text-slate-300">${row.latency_mean_ms} ms</td>
+              <td class="p-3 text-slate-600 dark:text-slate-300">${row.rfc3550_jitter_ms} ms</td>
+              <td class="p-3 text-emerald-600 dark:text-emerald-400 font-semibold">${row.frame_delivery_ratio_percent}%</td>
+              <td class="p-3 text-slate-600 dark:text-slate-300">${row.rebuffering_events} (${row.total_stall_seconds}s)</td>
+            `;
+            tbody.appendChild(tr);
+          });
+        }
+      } catch (err) {
+        console.error('Failed to fetch history:', err);
+      }
+      loadPlotsGallery();
+    }
+
+    function getPlotMetadata(filename) {
+      const meta = {
+        'fig1_throughput_vs_bandwidth.png': {
+          title: 'Throughput & Goodput vs. Bandwidth Limit',
+          tag: 'FIG 1',
+          desc: 'Comparative throughput and goodput curves under token-bucket bandwidth throttling.'
+        },
+        'fig2_latency_vs_injected_delay.png': {
+          title: 'Measured Latency vs. Injected Network Delay',
+          tag: 'FIG 2',
+          desc: 'Round-trip delay and application playout latency tracking across injected delay steps.'
+        },
+        'fig3_packet_loss_resilience.png': {
+          title: 'Packet Loss Resilience & Delivery Ratio',
+          tag: 'FIG 3',
+          desc: 'Frame delivery percentage and rebuffering stall frequency under packet drop rates.'
+        },
+        'fig4_jitter_analysis.png': {
+          title: 'RFC 3550 Interarrival Jitter Distribution',
+          tag: 'FIG 4',
+          desc: 'Statistical jitter dispersion and receiver playout buffer stabilization.'
+        },
+        'fig5_profiles_comparison.png': {
+          title: 'Standard Network Profiles Performance Matrix',
+          tag: 'FIG 5',
+          desc: 'Comprehensive multi-metric evaluation across realistic network impairment profiles.'
+        }
+      };
+      return meta[filename] || {
+        title: filename.replace('.png', '').replace(/_/g, ' '),
+        tag: 'PLOT',
+        desc: 'Publication benchmark figure generated from empirical experimental trials.'
+      };
+    }
+
+    async function loadPlotsGallery() {
+      try {
+        const res = await fetch('/api/plots');
+        const plots = await res.json();
+        const gallery = document.getElementById('plotsGallery');
+
+        if (!plots || plots.length === 0) {
+          gallery.innerHTML = '<div class="text-xs text-slate-400 col-span-full text-center py-8">No plots generated yet. Click "Re-render Figures" above.</div>';
+          return;
+        }
+
+        gallery.innerHTML = plots.map(p => {
+          const m = getPlotMetadata(p);
+          return `
+            <div class="bg-white dark:bg-[#111827] rounded-xl border border-slate-200/90 dark:border-[#1E2D44] shadow-sm p-4 flex flex-col justify-between hover:shadow-md transition">
+              <!-- Card Header -->
+              <div class="flex items-center justify-between gap-2 mb-3">
+                <div class="flex items-center space-x-2 min-w-0">
+                  <span class="px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30 shrink-0">${m.tag}</span>
+                  <h5 class="text-xs font-bold text-slate-900 dark:text-white truncate" title="${m.title}">${m.title}</h5>
+                </div>
+                <a href="/plots/${p}" target="_blank" rel="noopener noreferrer" class="text-[11px] text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-semibold inline-flex items-center space-x-1 shrink-0 hover:underline" title="Open full resolution 300 DPI original image in new tab">
+                  <span>Full Res</span>
+                  <i data-lucide="external-link" class="w-3 h-3"></i>
+                </a>
+              </div>
+
+              <!-- Figure Card Body: strictly responsive container with neutral light figure surface -->
+              <div class="w-full publication-figure-surface rounded-lg p-2 flex items-center justify-center overflow-hidden">
+                <img
+                  src="/plots/${p}?t=${Date.now()}"
+                  alt="${m.title}"
+                  class="publication-figure-img rounded cursor-zoom-in hover:opacity-95 transition"
+                  style="max-width: 100%; height: auto; display: block;"
+                  onclick="window.open('/plots/${p}', '_blank')"
+                  title="Click to view full-resolution publication figure (300 DPI)"
+                />
+              </div>
+
+              <!-- Figure Card Footer -->
+              <div class="flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400 pt-2.5 mt-2.5 border-t border-slate-100 dark:border-[#1E2D44]">
+                <span class="truncate pr-2">${m.desc}</span>
+                <span class="font-mono text-slate-400 dark:text-slate-500 shrink-0">300 DPI</span>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        lucide.createIcons();
+      } catch (err) {
+        console.error('Failed to load plots gallery:', err);
+      }
+    }
+
+    async function generatePlots() {
+      const btn = document.getElementById('btnGeneratePlots');
+      const origHtml = btn ? btn.innerHTML : '';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i><span>Rendering...</span>`;
+        lucide.createIcons();
+      }
+      try {
+        const res = await fetch('/api/generate-plots', { method: 'POST' });
+        const data = await res.json();
+        await loadPlotsGallery();
+      } catch (err) {
+        console.error('Failed to generate plots:', err);
+        alert('Failed to generate plots: ' + err);
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = origHtml;
+          lucide.createIcons();
+        }
+      }
+    }
+
+    // -------------------------------------------------------------
+    // Utility Helpers
+    // -------------------------------------------------------------
+    function formatDuration(seconds) {
+      const s = Math.round(seconds);
+      const mins = Math.floor(s / 60);
+      const secs = s % 60;
+      return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+    }
+
+    function formatFileSize(bytes) {
+      if (!bytes || bytes === 0) return '0 B';
+      const k = 1024;
+      const sizes = ['B', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    }
+
+    // =========================================================================
+    // GLOBAL THEME CONTROLLER (Dark / Light / System)
+    // =========================================================================
+    const themeMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+
+    function getStoredThemePreference() {
+      return localStorage.getItem('streamnet_theme') || 'system';
+    }
+
+    function isEffectiveDark(preference) {
+      if (preference === 'dark') return true;
+      if (preference === 'light') return false;
+      return themeMediaQuery.matches;
+    }
+
+    function setThemePreference(pref) {
+      localStorage.setItem('streamnet_theme', pref);
+      applyTheme(pref);
+    }
+
+    function applyTheme(pref) {
+      const isDark = isEffectiveDark(pref);
+      const html = document.documentElement;
+
+      if (isDark) {
+        html.classList.add('dark');
+        html.classList.remove('light');
+      } else {
+        html.classList.remove('dark');
+        html.classList.add('light');
+      }
+
+      // Update theme toggle UI buttons
+      updateThemeToggleButtons(pref, isDark);
+
+      // Update header theme badge
+      const themeBadge = document.getElementById('themeContextBadge');
+      if (themeBadge) {
+        if (pref === 'system') {
+          themeBadge.innerText = isDark ? 'System (Dark)' : 'System (Light)';
+          themeBadge.className = isDark
+            ? 'hidden sm:inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase bg-cyan-500/10 text-cyan-300 border border-cyan-500/20'
+            : 'hidden sm:inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase bg-[#EADEAC] text-[#16110D] border border-[#CAAD91]';
+        } else if (pref === 'dark') {
+          themeBadge.innerText = 'Dark Mode';
+          themeBadge.className = 'hidden sm:inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase bg-indigo-500/10 text-indigo-300 border border-indigo-500/20';
+        } else {
+          themeBadge.innerText = 'Light Mode';
+          themeBadge.className = 'hidden sm:inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase bg-[#EADEAC] text-[#16110D] border border-[#CAAD91]';
+        }
+      }
+
+      // Update Chart.js styling without losing live telemetry points
+      updateChartTheme(isDark);
+
+      if (window.lucide) {
+        lucide.createIcons();
+      }
+    }
+
+    function updateThemeToggleButtons(pref, isDark) {
+      const btnLight = document.getElementById('themeBtnLight');
+      const btnDark = document.getElementById('themeBtnDark');
+      const btnSystem = document.getElementById('themeBtnSystem');
+      if (!btnLight || !btnDark || !btnSystem) return;
+
+      const activeClasses = isDark
+        ? 'bg-indigo-600 text-white shadow-sm font-semibold'
+        : 'bg-white text-[#16110D] shadow-sm font-bold border border-[#CAAD91]';
+      const inactiveClasses = isDark
+        ? 'text-slate-400 hover:text-white bg-transparent border-transparent'
+        : 'text-[#483F34] hover:text-[#16110D] bg-transparent border-transparent';
+
+      [
+        { btn: btnLight, key: 'light' },
+        { btn: btnDark, key: 'dark' },
+        { btn: btnSystem, key: 'system' }
+      ].forEach(({ btn, key }) => {
+        const isSelected = (pref === key);
+        btn.setAttribute('aria-checked', isSelected ? 'true' : 'false');
+        btn.className = `px-2 py-1 rounded-md text-[11px] flex items-center space-x-1 transition ${isSelected ? activeClasses : inactiveClasses}`;
+      });
+    }
+
+    // Listen for OS theme changes when user chooses System preference
+    themeMediaQuery.addEventListener('change', () => {
+      if (getStoredThemePreference() === 'system') {
+        applyTheme('system');
+      }
+    });
+
+    // Initialization on Page Load
+    document.addEventListener('DOMContentLoaded', () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlTheme = urlParams.get('theme');
+      if (urlTheme && ['dark', 'light', 'system'].includes(urlTheme)) {
+        setThemePreference(urlTheme);
+      } else {
+        applyTheme(getStoredThemePreference());
+      }
+      lucide.createIcons();
+      updateLabSliderLabels();
+      loadCatalog();
+      refreshData();
+
+      const initialTab = urlParams.get('tab') || window.location.hash.replace('#', '') || 'overview';
+      switchTab(initialTab);
+    });
+  </script>
+</body>
+</html>

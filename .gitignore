@@ -48,3 +48,10 @@ experiments/results/plots/
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Environment & secrets
+.env
+.env.*
+
+# Media thumbnail cache
+media/.thumbnails/
