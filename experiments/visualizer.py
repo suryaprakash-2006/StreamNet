@@ -40,6 +40,8 @@ def load_master_dataframe(csv_path: Optional[Path] = None) -> pd.DataFrame:
     if not path.exists():
         raise FileNotFoundError(f"Experiment results file not found at: {path}")
     df = pd.read_csv(path)
+    if "timestamp" in df.columns and "scenario_id" in df.columns and "protocol" in df.columns:
+        df = df.sort_values("timestamp").groupby(["scenario_id", "protocol"], as_index=False).last()
     return df
 
 

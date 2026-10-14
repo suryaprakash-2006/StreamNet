@@ -50,6 +50,7 @@ class UDPServer:
         payload_generator: Generator[Tuple[int, bytes, HeaderFlags], None, None],
         target_fps: float = 30.0,
         max_chunk_size: int = MAX_UDP_PAYLOAD_SIZE,
+        pace_audio: bool = True,
     ) -> None:
         """
         Stream payloads to the target UDP endpoint.
@@ -62,9 +63,15 @@ class UDPServer:
         target_addr = (self.target_host, self.target_port)
 
         try:
-            for frame_id, payload, flags in payload_generator:
+            for item in payload_generator:
                 if not self.is_running:
                     break
+
+                if len(item) == 4:
+                    frame_id, payload, flags, msg_type = item
+                else:
+                    frame_id, payload, flags = item
+                    msg_type = MsgType.DATA_FRAME
 
                 send_time_ns = get_current_time_ns()
                 payload_len = len(payload)
@@ -84,8 +91,13 @@ class UDPServer:
                     if chunk_idx == total_chunks - 1:
                         chunk_flags |= HeaderFlags.LAST_CHUNK
 
+                    if msg_type in (MsgType.AUDIO_FRAME, MsgType.AUDIO_CHUNK):
+                        out_msg_type = MsgType.AUDIO_CHUNK if total_chunks > 1 else MsgType.AUDIO_FRAME
+                    else:
+                        out_msg_type = MsgType.DATA_CHUNK if total_chunks > 1 else MsgType.DATA_FRAME
+
                     header = UDPHeader(
-                        msg_type=MsgType.DATA_CHUNK if total_chunks > 1 else MsgType.DATA_FRAME,
+                        msg_type=out_msg_type,
                         flags=chunk_flags,
                         frame_id=frame_id,
                         packet_seq_num=self.packet_seq_num,
@@ -105,7 +117,8 @@ class UDPServer:
                 self.frames_sent += 1
 
                 # Frame rate pacing
-                if frame_interval_s > 0:
+                is_audio = msg_type in (MsgType.AUDIO_FRAME, MsgType.AUDIO_CHUNK)
+                if frame_interval_s > 0 and (pace_audio or not is_audio):
                     elapsed_s = (get_current_time_ns() - send_time_ns) / 1e9
                     sleep_time = frame_interval_s - elapsed_s
                     if sleep_time > 0:

@@ -1,8 +1,7 @@
 # StreamNet
 ### TCP vs. UDP for Real-Time Video Streaming Under Network Degradation
 
-[![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/downloads/)
-[![Tests](https://img.shields.io/badge/pytest-18%20passed-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/pytest-59%20passed-brightgreen.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Architecture: Socket-Level Impairment](https://img.shields.io/badge/Network-Socket--Level%20Impairment%20Proxy-cyan.svg)]()
 
@@ -167,13 +166,15 @@ Available suites: `all`, `baseline`, `latency`, `loss`, `bandwidth`, `jitter`, `
 python streamnet.py dashboard --port 8000
 ```
 Open **`http://127.0.0.1:8000`** in any web browser to:
-- Adjust real-time network impairment sliders (Latency, Loss, Bandwidth, Jitter).
-- Trigger live paired TCP vs UDP benchmarks.
-- View comparative KPI cards and dynamic Chart.js visualizations.
-- Browse the publication-grade scientific figure gallery.
+- Browse Mini-YouTube catalog with seekable HTTP byte-range video playback and waveform thumbnails.
+- Run real-time TCP vs UDP socket streaming with live MJPEG video and streaming audio (Synthetic 440Hz/880Hz, custom WAV files, or live browser microphone).
+- Adjust network impairment sliders in real time (Latency, Loss, Bandwidth, Jitter).
+- Inspect live bandwidth dynamics and publication figures with **independent horizontal scrolling** (smooth mouse-wheel translation, trackpad/touch support, "Latest →" jump, up to 1500 session telemetry points).
+- Monitor live, non-simulated audio transport KPIs (audio bitrate, jitter buffer depth ms, underrun stalls, and packet loss).
+- Trigger automated paired TCP vs UDP benchmark sweeps with publication figure generation.
 
 ### C. Run Standalone Streaming with Live OpenCV HUD
-**Terminal 1 (Start TCP Server):**
+**Terminal 1 (Start TCP Server with Synthetic Stream):**
 ```bash
 python streamnet.py server --protocol tcp --port 5001 --frames 300 --fps 30
 ```
@@ -191,7 +192,37 @@ python streamnet.py client --protocol udp --port 5002 --gui
 python streamnet.py server --protocol udp --target-host 127.0.0.1 --port 5002 --frames 300 --fps 30
 ```
 
-### D. Run Standalone Network Impairment Proxy
+### D. Streaming Custom Video Files (MP4 / AVI / MKV)
+Stream any video file (such as `sample.mp4`) instead of the synthetic generator using the `--video` flag:
+
+**TCP Custom Video Streaming:**
+```bash
+# Terminal 1: Start TCP Server with custom video file
+python streamnet.py server --protocol tcp --video sample.mp4 --port 5001
+
+# Terminal 2: Start Client with live GUI HUD
+python streamnet.py client --protocol tcp --port 5001 --gui
+```
+
+**UDP Custom Video Streaming with Controlled Network Impairment:**
+```bash
+# Terminal 1: Start Client
+python streamnet.py client --protocol udp --port 5002 --gui
+
+# Terminal 2: Start Impairment Proxy (5% loss, 40ms latency)
+python streamnet.py proxy --protocol udp --listen-port 6002 --target-port 5002 --loss 5.0 --latency 40
+
+# Terminal 3: Stream MP4 through the proxy to observe UDP frame loss
+python streamnet.py server --protocol udp --video sample.mp4 --target-host 127.0.0.1 --port 6002
+```
+
+> [!TIP]
+> Generate a sample test video in the workspace using Python:
+> ```bash
+> python -c "from server.video_source import VideoSource; VideoSource.create_sample_video('sample.mp4', duration_s=5)"
+> ```
+
+### E. Run Standalone Network Impairment Proxy
 Simulate a degraded 4G network between server and client:
 ```bash
 python streamnet.py proxy --protocol udp --listen-port 6002 --target-port 5002 --latency 50 --loss 3 --bandwidth 5 --jitter 15
@@ -220,35 +251,73 @@ From 28 executed benchmark runs across identical video workloads:
 
 ## 9. Running the Test Suite
 
-StreamNet includes full automated unit and integration tests with 100% pass rate:
+StreamNet includes comprehensive automated unit and integration tests across networking, media serving, socket impairment, audio streaming, and live dashboard bridges with a 100% pass rate:
 
 ```bash
 pytest -v
 ```
 ```
 ============================= test session starts =============================
-collected 18 items
+collected 56 items
 
-tests/test_emulator.py::test_udp_emulator_latency_injection PASSED       [  5%]
-tests/test_emulator.py::test_udp_emulator_packet_loss PASSED             [ 11%]
-tests/test_emulator.py::test_tcp_emulator_bandwidth_throttling PASSED    [ 16%]
-tests/test_experiments.py::test_experiment_runner_single_scenario PASSED [ 22%]
-tests/test_m1_networking.py::test_tcp_streaming_loopback PASSED          [ 27%]
-tests/test_m1_networking.py::test_udp_streaming_loopback PASSED          [ 33%]
-tests/test_metrics.py::test_metrics_collector_basic PASSED               [ 38%]
-tests/test_metrics.py::test_udp_packet_loss_and_out_of_order PASSED      [ 44%]
-tests/test_metrics.py::test_rfc3550_jitter_calculation PASSED            [ 50%]
-tests/test_protocol.py::test_tcp_header_pack_unpack PASSED               [ 55%]
-tests/test_protocol.py::test_tcp_header_invalid_magic PASSED             [ 61%]
-tests/test_protocol.py::test_tcp_header_short_buffer PASSED              [ 66%]
-tests/test_protocol.py::test_udp_header_pack_unpack PASSED               [ 72%]
-tests/test_protocol.py::test_udp_header_invalid_magic PASSED             [ 77%]
+tests/test_audio_streaming.py::test_audio_source_synthetic_sine PASSED   [  1%]
+tests/test_audio_streaming.py::test_audio_source_synthetic_ping PASSED   [  3%]
+tests/test_audio_streaming.py::test_audio_source_wav_file PASSED         [  5%]
+tests/test_audio_streaming.py::test_audio_source_missing_wav_file PASSED [  7%]
+tests/test_audio_streaming.py::test_audio_wav_header_generation PASSED   [  8%]
+tests/test_audio_streaming.py::test_audio_playout_buffer_lifecycle PASSED [ 10%]
+tests/test_audio_streaming.py::test_live_dashboard_audio_streaming_lifecycle PASSED [ 12%]
+tests/test_audio_streaming.py::test_live_dashboard_synced_av_streaming PASSED [ 14%]
+tests/test_audio_streaming.py::test_live_dashboard_microphone_injection PASSED [ 16%]
+tests/test_dashboard_streaming.py::test_live_status_idle PASSED          [ 17%]
+tests/test_dashboard_streaming.py::test_live_video_feed_not_found_when_idle PASSED [ 19%]
+tests/test_dashboard_streaming.py::test_live_start_invalid_protocol PASSED [ 21%]
+tests/test_dashboard_streaming.py::test_live_start_missing_custom_file PASSED [ 23%]
+tests/test_dashboard_streaming.py::test_live_tcp_session_lifecycle PASSED [ 25%]
+tests/test_dashboard_streaming.py::test_live_udp_session_with_impairment PASSED [ 26%]
+tests/test_dashboard_streaming.py::test_live_custom_video_streaming PASSED [ 28%]
+tests/test_dashboard_streaming.py::test_live_sse_telemetry PASSED        [ 30%]
+tests/test_dashboard_streaming.py::test_index_template_rendering_and_components PASSED [ 32%]
+tests/test_dashboard_streaming.py::test_lan_compatibility_relative_api_urls PASSED [ 33%]
+tests/test_emulator.py::test_udp_emulator_latency_injection PASSED       [ 35%]
+tests/test_emulator.py::test_udp_emulator_packet_loss PASSED             [ 37%]
+tests/test_emulator.py::test_tcp_emulator_bandwidth_throttling PASSED    [ 39%]
+tests/test_experiments.py::test_experiment_runner_single_scenario PASSED [ 41%]
+tests/test_m1_networking.py::test_tcp_streaming_loopback PASSED          [ 42%]
+tests/test_m1_networking.py::test_udp_streaming_loopback PASSED          [ 44%]
+tests/test_media_library.py::test_empty_media_directory PASSED           [ 46%]
+tests/test_media_library.py::test_catalog_listing_and_metadata PASSED    [ 48%]
+tests/test_media_library.py::test_get_video_item_by_id PASSED            [ 50%]
+tests/test_media_library.py::test_unknown_video_id PASSED                [ 51%]
+tests/test_media_library.py::test_path_traversal_prevention PASSED       [ 53%]
+tests/test_media_library.py::test_byte_range_requests_seekable PASSED    [ 55%]
+tests/test_media_library.py::test_thumbnail_generation_and_retrieval PASSED [ 57%]
+tests/test_media_library.py::test_corrupted_or_invalid_video_file_in_catalog PASSED [ 58%]
+tests/test_media_library.py::test_live_start_using_video_id PASSED       [ 60%]
+tests/test_media_library.py::test_multi_video_discovery_and_nested_directories PASSED [ 62%]
+tests/test_media_library.py::test_head_requests_for_stream_and_thumbnail PASSED [ 64%]
+tests/test_media_library.py::test_diagnostic_endpoint PASSED             [ 66%]
+tests/test_media_library.py::test_direct_media_route_access PASSED       [ 67%]
+tests/test_metrics.py::test_metrics_collector_basic PASSED               [ 69%]
+tests/test_metrics.py::test_udp_packet_loss_and_out_of_order PASSED      [ 71%]
+tests/test_metrics.py::test_rfc3550_jitter_calculation PASSED            [ 73%]
+tests/test_protocol.py::test_tcp_header_pack_unpack PASSED               [ 75%]
+tests/test_protocol.py::test_tcp_header_invalid_magic PASSED             [ 76%]
+tests/test_protocol.py::test_tcp_header_short_buffer PASSED              [ 78%]
+tests/test_protocol.py::test_udp_header_pack_unpack PASSED               [ 80%]
+tests/test_protocol.py::test_udp_header_invalid_magic PASSED             [ 82%]
 tests/test_video_streaming.py::test_video_source_generation PASSED       [ 83%]
-tests/test_video_streaming.py::test_playout_buffer_state_transitions PASSED [ 88%]
-tests/test_video_streaming.py::test_tcp_video_streaming_integration PASSED [ 94%]
-tests/test_video_streaming.py::test_udp_video_streaming_integration PASSED [100%]
+tests/test_video_streaming.py::test_playout_buffer_state_transitions PASSED [ 85%]
+tests/test_video_streaming.py::test_tcp_video_streaming_integration PASSED [ 87%]
+tests/test_video_streaming.py::test_udp_video_streaming_integration PASSED [ 89%]
+tests/test_video_streaming.py::test_read_video_file_valid PASSED         [ 91%]
+tests/test_video_streaming.py::test_read_video_file_missing_path PASSED  [ 92%]
+tests/test_video_streaming.py::test_read_video_file_eof_and_max_frames PASSED [ 94%]
+tests/test_video_streaming.py::test_tcp_custom_video_streaming PASSED    [ 96%]
+tests/test_video_streaming.py::test_udp_custom_video_streaming PASSED    [ 98%]
+tests/test_video_streaming.py::test_playback_renderer_draw_hud_regression PASSED [100%]
 
-============================= 18 passed in 7.20s ==============================
+======================= 56 passed, 1 warning in 23.35s ========================
 ```
 
 ---
@@ -258,17 +327,20 @@ tests/test_video_streaming.py::test_udp_video_streaming_integration PASSED [100%
 ```
 StreamNet/
 ├── client/                   # Streaming client subsystem
-│   ├── buffer.py             # Playout buffer state machine & stall tracking
+│   ├── audio_buffer.py       # Audio jitter buffer, underrun detection & depth tracking
+│   ├── buffer.py             # Video playout buffer state machine & stall tracking
 │   ├── playback.py           # Video decoder & live telemetry HUD renderer
-│   ├── tcp_client.py         # Stream-oriented TCP receiver
-│   └── udp_client.py         # Datagram-oriented UDP receiver & chunk reassembly
+│   ├── tcp_client.py         # Stream-oriented TCP receiver (video + audio dispatch)
+│   └── udp_client.py         # Datagram-oriented UDP receiver (reassembly & audio dispatch)
 ├── common/                   # Protocol definitions
-│   └── protocol.py           # Binary packing for 24B TCP and 32B UDP headers
-├── dashboard/                # Web evaluation dashboard
-│   ├── app.py                # FastAPI backend API
+│   └── protocol.py           # Binary packing for 24B TCP and 32B UDP headers (MsgType: VIDEO, AUDIO)
+├── dashboard/                # Web evaluation dashboard & media hub
+│   ├── app.py                # FastAPI backend API, SSE telemetry & audio streaming
+│   ├── media.py              # Media catalog, byte-range serving & waveform thumbnails
+│   ├── session.py            # Live streaming session manager, audio buffer & bridge queues
 │   ├── static/               # Static assets
 │   └── templates/
-│       └── index.html        # Interactive Tailwind + Chart.js dashboard
+│       └── index.html        # Responsive Mini-YouTube UI, audio player, & horizontally scrollable charts
 ├── docs/                     # Detailed specifications
 │   ├── ARCHITECTURE.md       # Architecture, technical trade-offs & proxy boundaries
 │   ├── EXPERIMENTS.md        # Comprehensive experimental data & empirical findings
@@ -287,10 +359,20 @@ StreamNet/
 │   ├── emulator.py           # Pipelined priority-queue delay, loss, and token-bucket proxy
 │   └── profiles.py           # Standardized profiles (Fiber, 4G, Satellite, etc.)
 ├── server/                   # Streaming server subsystem
-│   ├── tcp_server.py         # TCP framed streaming server
+│   ├── audio_source.py       # Deterministic sine/ping generators & WAV file reader
+│   ├── tcp_server.py         # TCP framed streaming server (video + audio multiplexing)
 │   ├── udp_server.py         # UDP datagram streaming server with MTU chunking
 │   └── video_source.py       # Deterministic synthetic video generator & file loader
-├── tests/                    # Automated Pytest suite (18 unit & integration tests)
+├── tests/                    # Automated Pytest suite (59 unit & integration tests)
+│   ├── test_audio_streaming.py      # Audio generator, buffer, TCP/UDP & mic tests
+│   ├── test_dashboard_streaming.py  # Live session lifecycle, SSE & bridge tests
+│   ├── test_emulator.py             # Socket impairment latency, loss & rate limiting
+│   ├── test_experiments.py          # Automated benchmark execution
+│   ├── test_m1_networking.py        # Loopback TCP/UDP transport tests
+│   ├── test_media_library.py        # Media catalog, byte ranges & diagnostics
+│   ├── test_metrics.py              # Telemetry, jitter & packet loss
+│   ├── test_protocol.py             # Header serialization & integrity
+│   └── test_video_streaming.py      # Video decoding, buffers & playback
 ├── streamnet.py              # Main unified CLI entrypoint
 ├── requirements.txt          # Python dependencies
 └── README.md                 # Project documentation

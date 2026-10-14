@@ -53,6 +53,7 @@ class TCPServer:
         self,
         payload_generator: Generator[Tuple[int, bytes, HeaderFlags], None, None],
         target_fps: float = 30.0,
+        pace_audio: bool = True,
     ) -> None:
         """
         Accept a single client connection and stream payloads from the generator.
@@ -77,13 +78,19 @@ class TCPServer:
         frame_interval_s = 1.0 / target_fps if target_fps > 0 else 0.0
 
         try:
-            for frame_id, payload, flags in payload_generator:
+            for item in payload_generator:
                 if not self.is_running:
                     break
 
+                if len(item) == 4:
+                    frame_id, payload, flags, msg_type = item
+                else:
+                    frame_id, payload, flags = item
+                    msg_type = MsgType.DATA_FRAME
+
                 send_time_ns = get_current_time_ns()
                 header = TCPHeader(
-                    msg_type=MsgType.DATA_FRAME,
+                    msg_type=msg_type,
                     flags=flags,
                     frame_id=frame_id,
                     timestamp_ns=send_time_ns,
@@ -97,7 +104,8 @@ class TCPServer:
                 self.bytes_sent += len(packet_bytes)
 
                 # Frame rate pacing
-                if frame_interval_s > 0:
+                is_audio = msg_type in (MsgType.AUDIO_FRAME, MsgType.AUDIO_CHUNK)
+                if frame_interval_s > 0 and (pace_audio or not is_audio):
                     elapsed_s = (get_current_time_ns() - send_time_ns) / 1e9
                     sleep_time = frame_interval_s - elapsed_s
                     if sleep_time > 0:

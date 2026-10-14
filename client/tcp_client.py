@@ -52,11 +52,13 @@ class TCPClient:
         server_port: int = 5001,
         metrics_collector: Optional[MetricsCollector] = None,
         on_frame_received: Optional[Callable[[int, bytes, TCPHeader], None]] = None,
+        on_audio_received: Optional[Callable[[int, bytes, TCPHeader], None]] = None,
     ):
         self.server_host = server_host
         self.server_port = server_port
         self.metrics = metrics_collector or MetricsCollector(protocol="TCP")
         self.on_frame_received = on_frame_received
+        self.on_audio_received = on_audio_received
 
         self.sock: Optional[socket.socket] = None
         self.is_running = False
@@ -115,8 +117,14 @@ class TCPClient:
                 )
                 self.metrics.record_frame_completed(header.frame_id)
 
-                if self.on_frame_received:
-                    self.on_frame_received(header.frame_id, payload, header)
+                if header.msg_type in (MsgType.AUDIO_FRAME, MsgType.AUDIO_CHUNK):
+                    if self.on_audio_received:
+                        self.on_audio_received(header.frame_id, payload, header)
+                    elif self.on_frame_received:
+                        self.on_frame_received(header.frame_id, payload, header)
+                else:
+                    if self.on_frame_received:
+                        self.on_frame_received(header.frame_id, payload, header)
 
         except Exception as err:
             logger.error("Error during TCP stream reception: %s", err)

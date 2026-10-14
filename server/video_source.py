@@ -6,6 +6,7 @@ Provides deterministic synthetic video frame generation with dynamic visual over
 """
 
 import math
+import os
 import time
 from typing import Generator, Optional, Tuple
 import cv2
@@ -32,6 +33,8 @@ class VideoSource:
         self.fps = fps
         self.jpeg_quality = max(10, min(100, jpeg_quality))
         self.gop_size = gop_size
+        self.detected_fps: Optional[float] = None
+        self.detected_frame_count: Optional[int] = None
 
     def generate_synthetic_stream(
         self,
@@ -145,11 +148,23 @@ class VideoSource:
         max_frames: Optional[int] = None,
     ) -> Generator[Tuple[int, bytes, HeaderFlags], None, None]:
         """
-        Read frames from a video file and yield JPEG-encoded payloads.
+        Read frames from a custom video file (e.g. MP4) and yield JPEG-encoded payloads.
+        Handles file verification, resizing, and clean EOF termination.
         """
+        if not os.path.exists(video_path):
+            raise FileNotFoundError(f"Video file not found at path: {video_path}")
+
         cap = cv2.VideoCapture(video_path)
         if not cap.isOpened():
-            raise FileNotFoundError(f"Cannot open video source: {video_path}")
+            raise ValueError(f"Cannot open video source (unsupported format or corrupt file): {video_path}")
+
+        native_fps = cap.get(cv2.CAP_PROP_FPS)
+        if native_fps and native_fps > 0:
+            self.detected_fps = float(native_fps)
+
+        frame_count = cap.get(cv2.CAP_PROP_FRAME_COUNT)
+        if frame_count and frame_count > 0:
+            self.detected_frame_count = int(frame_count)
 
         encode_params = [int(cv2.IMWRITE_JPEG_QUALITY), self.jpeg_quality]
         frame_idx = 0
@@ -160,12 +175,13 @@ class VideoSource:
                     break
 
                 ret, frame = cap.read()
-                if not ret:
+                if not ret or frame is None:
+                    # Clean End-of-File reached
                     break
 
-                # Resize if needed
+                # Resize to target transport dimensions if needed
                 if frame.shape[1] != self.width or frame.shape[0] != self.height:
-                    frame = cv2.resize(frame, (self.width, self.height))
+                    frame = cv2.resize(frame, (self.width, self.height), interpolation=cv2.INTER_AREA)
 
                 success, encoded_img = cv2.imencode(".jpg", frame, encode_params)
                 if not success:
@@ -173,7 +189,69 @@ class VideoSource:
 
                 payload = encoded_img.tobytes()
                 flags = HeaderFlags.KEYFRAME if frame_idx % self.gop_size == 0 else HeaderFlags.NONE
+                if max_frames is not None and frame_idx == max_frames - 1:
+                    flags |= HeaderFlags.LAST_CHUNK
+
                 yield (frame_idx, payload, flags)
                 frame_idx += 1
         finally:
             cap.release()
+
+    def get_stream(
+        self,
+        video_path: Optional[str] = None,
+        total_frames: Optional[int] = None,
+    ) -> Generator[Tuple[int, bytes, HeaderFlags], None, None]:
+        """
+        Yields video stream from a custom video file if provided and valid;
+        otherwise falls back seamlessly to the synthetic bouncing-ball test generator.
+        """
+        if video_path is not None and str(video_path).strip() != "":
+            return self.read_video_file(str(video_path).strip(), max_frames=total_frames)
+        return self.generate_synthetic_stream(total_frames=total_frames or 150)
+
+    @staticmethod
+    def create_sample_video(
+        output_path: str,
+        duration_s: float = 3.0,
+        fps: int = 30,
+        width: int = 640,
+        height: int = 480,
+    ) -> str:
+        """
+        Generates a valid standalone MP4 video file for testing and demos.
+        """
+        total_frames = max(1, int(duration_s * fps))
+        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+        out = cv2.VideoWriter(output_path, fourcc, float(fps), (width, height))
+        if not out.isOpened():
+            raise RuntimeError(f"Failed to initialize VideoWriter for path: {output_path}")
+
+        try:
+            for i in range(total_frames):
+                frame = np.zeros((height, width, 3), dtype=np.uint8)
+                # Background color gradient
+                frame[:, :, 0] = np.uint8((np.arange(width) / width) * 200)
+                frame[:, :, 1] = np.uint8((np.arange(height)[:, np.newaxis] / height) * 150)
+                frame[:, :, 2] = np.uint8(100 + 100 * math.sin(i * 0.1))
+
+                # Dynamic moving indicator bar
+                bar_x = int((i * 12) % width)
+                cv2.rectangle(frame, (bar_x, 0), (min(width, bar_x + 35), height), (0, 255, 255), -1)
+
+                # Text banner
+                cv2.putText(
+                    frame,
+                    f"StreamNet Custom MP4 - Frame {i:04d}/{total_frames:04d}",
+                    (25, height // 2),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.7,
+                    (255, 255, 255),
+                    2,
+                    cv2.LINE_AA,
+                )
+                out.write(frame)
+        finally:
+            out.release()
+
+        return output_path

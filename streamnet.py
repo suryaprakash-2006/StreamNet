@@ -42,17 +42,30 @@ def cmd_server(args):
     """Start standalone streaming server."""
     source = VideoSource(width=args.width, height=args.height, fps=args.fps, jpeg_quality=args.quality)
 
+    video_path = getattr(args, "video", None)
+    if video_path:
+        import os
+        if not os.path.exists(video_path):
+            print(f"[Error] Video file not found at path: {video_path}")
+            sys.exit(1)
+        stream_desc = f"custom video '{video_path}'"
+    else:
+        stream_desc = f"synthetic bouncing-ball ({args.frames} frames)"
+
+    stream_gen = source.get_stream(video_path=video_path, total_frames=args.frames)
+    target_fps = source.detected_fps if (source.detected_fps and not args.fps) else args.fps
+
     if args.protocol.upper() == "TCP":
         server = TCPServer(host=args.host, port=args.port)
         server.start()
-        print(f"[TCP Server] Listening on {args.host}:{args.port}. Streaming {args.frames} frames @ {args.fps} FPS...")
-        server.stream_payloads(source.generate_synthetic_stream(total_frames=args.frames), target_fps=args.fps)
+        print(f"[TCP Server] Listening on {args.host}:{args.port}. Streaming {stream_desc} @ {target_fps} FPS...")
+        server.stream_payloads(stream_gen, target_fps=target_fps)
         server.stop()
     else:
         server = UDPServer(target_host=args.target_host, target_port=args.port)
         server.start()
-        print(f"[UDP Server] Streaming {args.frames} frames @ {args.fps} FPS to {args.target_host}:{args.port}...")
-        server.stream_payloads(source.generate_synthetic_stream(total_frames=args.frames), target_fps=args.fps, max_chunk_size=1400)
+        print(f"[UDP Server] Streaming {stream_desc} @ {target_fps} FPS to {args.target_host}:{args.port}...")
+        server.stream_payloads(stream_gen, target_fps=target_fps, max_chunk_size=1400)
         server.stop()
 
 
@@ -164,7 +177,13 @@ def cmd_dashboard(args):
     """Launch FastAPI web dashboard."""
     import uvicorn
     from dashboard.app import app
+    from dashboard.media import get_local_ip_addresses
     print(f"Starting StreamNet Dashboard on http://{args.host}:{args.port}")
+    if args.host in ("0.0.0.0", "::"):
+        ips = get_local_ip_addresses()
+        print(f"Accessible on local machine: http://localhost:{args.port}")
+        for ip in ips:
+            print(f"Accessible over LAN:           http://{ip}:{args.port}")
     uvicorn.run(app, host=args.host, port=args.port)
 
 
@@ -185,6 +204,7 @@ def main():
     p_server.add_argument("--width", type=int, default=640, help="Video width")
     p_server.add_argument("--height", type=int, default=480, help="Video height")
     p_server.add_argument("--quality", type=int, default=75, help="JPEG quality")
+    p_server.add_argument("--video", type=str, default=None, help="Path to custom video file (e.g. sample.mp4). Falls back to synthetic stream if omitted.")
 
     # Client parser
     p_client = subparsers.add_parser("client", help="Run StreamNet Client")
@@ -218,7 +238,7 @@ def main():
 
     # Dashboard parser
     p_dash = subparsers.add_parser("dashboard", help="Launch interactive web dashboard")
-    p_dash.add_argument("--host", default="127.0.0.1", help="Host")
+    p_dash.add_argument("--host", default="0.0.0.0", help="Host interface to bind (default: 0.0.0.0 for LAN access)")
     p_dash.add_argument("--port", type=int, default=8000, help="Port")
 
     args = parser.parse_args()

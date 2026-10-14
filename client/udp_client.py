@@ -35,12 +35,14 @@ class UDPClient:
         listen_port: int = 5002,
         metrics_collector: Optional[MetricsCollector] = None,
         on_frame_received: Optional[Callable[[int, bytes, UDPHeader], None]] = None,
+        on_audio_received: Optional[Callable[[int, bytes, UDPHeader], None]] = None,
         socket_timeout_s: float = 2.0,
     ):
         self.listen_host = listen_host
         self.listen_port = listen_port
         self.metrics = metrics_collector or MetricsCollector(protocol="UDP")
         self.on_frame_received = on_frame_received
+        self.on_audio_received = on_audio_received
         self.socket_timeout_s = socket_timeout_s
 
         self.sock: Optional[socket.socket] = None
@@ -131,8 +133,14 @@ class UDPClient:
 
                     self.metrics.record_frame_completed(frame_id)
 
-                    if self.on_frame_received:
-                        self.on_frame_received(frame_id, full_frame_payload, header)
+                    if header.msg_type in (MsgType.AUDIO_FRAME, MsgType.AUDIO_CHUNK):
+                        if self.on_audio_received:
+                            self.on_audio_received(frame_id, full_frame_payload, header)
+                        elif self.on_frame_received:
+                            self.on_frame_received(frame_id, full_frame_payload, header)
+                    else:
+                        if self.on_frame_received:
+                            self.on_frame_received(frame_id, full_frame_payload, header)
 
                     # Clean up reassembly storage
                     del self.reassembly_buffer[frame_id]
