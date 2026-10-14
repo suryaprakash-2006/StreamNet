@@ -285,9 +285,15 @@
     html.light h4.text-white,
     html.light h5.text-white,
     html.light p.text-white,
+    html.light span.text-white:not([class*="badge"]):not([class*="bg-"]):not(button.bg- *),
+    html.light #overviewTransportEngine,
     html.light label.text-slate-300,
     html.light .text-slate-200:not([class*="badge"]):not([class*="bg-"]) {
       color: var(--theme-text-primary) !important;
+    }
+
+    html.light .border-\[\#1E2D44\]\/60 {
+      border-color: var(--theme-border-subtle) !important;
     }
 
     html.light .text-slate-300:not([class*="badge"]):not([class*="bg-"]) {
@@ -674,25 +680,78 @@
       background: var(--theme-accent-olive);
     }
 
-    /* Light Mode Table Scrollbars */
+    /* Table Scrollbars (Responsive in Light and Dark Modes) */
+    .table-scroll-wrapper,
     .light-scroll-wrapper {
       overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
       scrollbar-width: thin;
-      scrollbar-color: #CAAD91 #FAF4E6;
+      scrollbar-color: var(--theme-border-strong) var(--theme-bg-card-subtle);
     }
+    .table-scroll-wrapper::-webkit-scrollbar,
     .light-scroll-wrapper::-webkit-scrollbar {
       height: 6px;
       width: 6px;
     }
+    .table-scroll-wrapper::-webkit-scrollbar-track,
     .light-scroll-wrapper::-webkit-scrollbar-track {
       background: var(--theme-bg-card-subtle);
+      border-radius: 4px;
     }
+    .table-scroll-wrapper::-webkit-scrollbar-thumb,
     .light-scroll-wrapper::-webkit-scrollbar-thumb {
       background: var(--theme-border-strong);
       border-radius: 4px;
     }
+    .table-scroll-wrapper::-webkit-scrollbar-thumb:hover,
     .light-scroll-wrapper::-webkit-scrollbar-thumb:hover {
-      background: #966837;
+      background: var(--theme-accent-olive);
+    }
+
+    /* Master Benchmark Results Archive Table */
+    .benchmark-table {
+      width: 100%;
+      min-width: 1020px;
+      border-collapse: separate;
+      border-spacing: 0;
+    }
+    .benchmark-table thead th {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      padding: 10px 14px;
+      white-space: nowrap;
+    }
+    html.dark .benchmark-table thead th {
+      background-color: #0E1624 !important;
+      color: #CBD5E1 !important;
+      border-bottom: 2px solid #2A3C5A !important;
+    }
+    html.light .benchmark-table thead th {
+      background-color: #EDE4CB !important;
+      color: #16110D !important;
+      border-bottom: 2px solid #CAAD91 !important;
+    }
+    .benchmark-table tbody tr {
+      transition: background-color 0.15s ease;
+    }
+    html.light .benchmark-table tbody tr:hover {
+      background-color: var(--theme-bg-card-hover) !important;
+    }
+    html.dark .benchmark-table tbody tr:hover {
+      background-color: #162132 !important;
+    }
+    .benchmark-table tbody td {
+      padding: 11px 14px;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    html.light .benchmark-table tbody td {
+      border-bottom: 1px solid #EFE6D2 !important;
+    }
+    html.dark .benchmark-table tbody td {
+      border-bottom: 1px solid #162132 !important;
     }
 
     /* Publication Figure Responsive Cards */
@@ -905,43 +964,73 @@
           </div>
         </div>
 
-        <!-- 4 Metric Cards -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <!-- 4 Metric Cards: Consistent Two-Column Desktop Grid & Single-Column Mobile Layout -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
 
-          <div class="p-4 rounded-xl bg-[#111827] border border-[#1E2D44] shadow space-y-1">
-            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Transport Engine</span>
+          <!-- Card 1: Transport Engine -->
+          <div class="p-5 rounded-xl bg-[#111827] border border-[#1E2D44] shadow-sm flex flex-col justify-between space-y-3 min-w-0 transition hover:border-slate-500/30">
             <div class="flex items-center justify-between">
-              <span id="overviewTransportEngine" class="text-lg font-black text-white font-mono">TCP / UDP</span>
-              <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20">Active</span>
+              <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Transport Engine</span>
+              <span class="px-2.5 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">Active</span>
             </div>
-            <span class="text-[11px] text-slate-500 block">Big-Endian Binary Framing</span>
+            <div class="py-1">
+              <span id="overviewTransportEngine" class="text-2xl font-black font-mono text-[#16110D] dark:text-white tracking-tight">TCP / UDP</span>
+            </div>
+            <div class="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 pt-2 border-t border-[#1E2D44]/60">
+              <span>Binary Framing</span>
+              <span class="font-mono text-[11px] font-semibold text-slate-600 dark:text-slate-300">Big-Endian (SN-P v1.0)</span>
+            </div>
           </div>
 
-          <div class="p-4 rounded-xl bg-[#111827] border border-[#1E2D44] shadow space-y-1">
-            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Pipeline State</span>
+          <!-- Card 2: Pipeline State -->
+          <div class="p-5 rounded-xl bg-[#111827] border border-[#1E2D44] shadow-sm flex flex-col justify-between space-y-3 min-w-0 transition hover:border-slate-500/30">
             <div class="flex items-center justify-between">
-              <span id="overviewPipelineState" class="text-lg font-black text-emerald-400 font-mono">IDLE</span>
-              <span class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></span>
+              <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Pipeline State</span>
+              <span id="overviewPipelineBadge" class="px-2.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse"></span>Ready
+              </span>
             </div>
-            <span class="text-[11px] text-slate-500 block">Playout Buffer Primed</span>
+            <div class="py-1">
+              <span id="overviewPipelineState" class="text-2xl font-black font-mono text-emerald-600 dark:text-emerald-400 tracking-tight">IDLE</span>
+            </div>
+            <div class="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 pt-2 border-t border-[#1E2D44]/60">
+              <span>Receiver Buffer</span>
+              <span class="font-mono text-[11px] font-semibold text-slate-600 dark:text-slate-300">Playout Buffer Primed</span>
+            </div>
           </div>
 
-          <div class="p-4 rounded-xl bg-[#111827] border border-[#1E2D44] shadow space-y-1">
-            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Recorded Experiments</span>
+          <!-- Card 3: Recorded Experiments -->
+          <div class="p-5 rounded-xl bg-[#111827] border border-[#1E2D44] shadow-sm flex flex-col justify-between space-y-3 min-w-0 transition hover:border-slate-500/30">
             <div class="flex items-center justify-between">
-              <span id="overviewRecordedCount" class="text-lg font-black text-cyan-300 font-mono">Master CSV</span>
-              <i data-lucide="database" class="w-4 h-4 text-cyan-400"></i>
+              <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Recorded Experiments</span>
+              <span class="px-2.5 py-0.5 rounded text-[10px] font-bold bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20 flex items-center gap-1">
+                <i data-lucide="database" class="w-3 h-3"></i><span>Master CSV</span>
+              </span>
             </div>
-            <span class="text-[11px] text-slate-500 block">Controlled Benchmark Sweeps</span>
+            <div class="py-1">
+              <span id="overviewRecordedCount" class="text-2xl font-black font-mono text-cyan-600 dark:text-cyan-300 tracking-tight">Master CSV</span>
+            </div>
+            <div class="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 pt-2 border-t border-[#1E2D44]/60">
+              <span>Benchmark Matrix</span>
+              <span class="font-mono text-[11px] font-semibold text-slate-600 dark:text-slate-300">Controlled Impairment Sweeps</span>
+            </div>
           </div>
 
-          <div class="p-4 rounded-xl bg-[#111827] border border-[#1E2D44] shadow space-y-1">
-            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Media Assets</span>
+          <!-- Card 4: Media Assets -->
+          <div class="p-5 rounded-xl bg-[#111827] border border-[#1E2D44] shadow-sm flex flex-col justify-between space-y-3 min-w-0 transition hover:border-slate-500/30">
             <div class="flex items-center justify-between">
-              <span id="overviewMediaCount" class="text-lg font-black text-amber-300 font-mono">Library</span>
-              <i data-lucide="film" class="w-4 h-4 text-amber-400"></i>
+              <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Media Assets</span>
+              <span class="px-2.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 flex items-center gap-1">
+                <i data-lucide="film" class="w-3 h-3"></i><span>Catalog</span>
+              </span>
             </div>
-            <span class="text-[11px] text-slate-500 block">RFC 7233 Byte-Range Playback</span>
+            <div class="py-1">
+              <span id="overviewMediaCount" class="text-2xl font-black font-mono text-amber-700 dark:text-amber-300 tracking-tight">5 Files</span>
+            </div>
+            <div class="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 pt-2 border-t border-[#1E2D44]/60">
+              <span>Streaming Protocol</span>
+              <span class="font-mono text-[11px] font-semibold text-slate-600 dark:text-slate-300">RFC 7233 Byte-Range Playback</span>
+            </div>
           </div>
 
         </div>
@@ -1619,7 +1708,7 @@
           </div>
         </div>
 
-        <!-- Master Results History Table (Light Theme) -->
+        <!-- Master Results History Table -->
         <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-4">
           <div class="flex items-center justify-between pb-3 border-b border-slate-200">
             <div>
@@ -1629,24 +1718,29 @@
               </h3>
               <p class="text-xs text-slate-500 mt-0.5">Recorded experimental trials from <code class="font-mono text-blue-600">master_experiment_results.csv</code></p>
             </div>
+            <div class="flex items-center space-x-2">
+              <span class="px-2.5 py-1 rounded text-[11px] font-mono font-bold bg-slate-100 dark:bg-[#0E1624] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-[#1E2D44]">
+                CSV Archive
+              </span>
+            </div>
           </div>
-          <div class="light-scroll-wrapper">
-            <table class="w-full text-left text-xs text-slate-700">
-              <thead class="bg-slate-100 text-slate-600 uppercase font-semibold text-[10px] border-b border-slate-200">
+          <div class="table-scroll-wrapper rounded-lg border border-slate-200 dark:border-[#1E2D44]">
+            <table class="benchmark-table w-full text-xs">
+              <thead>
                 <tr>
-                  <th class="p-3">Scenario</th>
-                  <th class="p-3">Protocol</th>
-                  <th class="p-3">Latency</th>
-                  <th class="p-3">Loss</th>
-                  <th class="p-3">Bandwidth</th>
-                  <th class="p-3">Throughput</th>
-                  <th class="p-3">Delay</th>
-                  <th class="p-3">RFC Jitter</th>
-                  <th class="p-3">Frame Deliv %</th>
-                  <th class="p-3">Stalls</th>
+                  <th class="text-left" style="min-width: 220px;">Scenario</th>
+                  <th class="text-center" style="min-width: 85px;">Protocol</th>
+                  <th class="text-right" style="min-width: 90px;">Latency</th>
+                  <th class="text-right" style="min-width: 80px;">Loss</th>
+                  <th class="text-right" style="min-width: 105px;">Bandwidth</th>
+                  <th class="text-right" style="min-width: 110px;">Throughput</th>
+                  <th class="text-right" style="min-width: 100px;">Delay (Mean)</th>
+                  <th class="text-right" style="min-width: 100px;">RFC Jitter</th>
+                  <th class="text-right" style="min-width: 100px;">Delivery %</th>
+                  <th class="text-right" style="min-width: 110px;">Stalls</th>
                 </tr>
               </thead>
-              <tbody id="historyTableBody" class="divide-y divide-slate-200 font-mono">
+              <tbody id="historyTableBody" class="font-mono divide-y divide-slate-200 dark:divide-[#162132]">
                 <tr>
                   <td colspan="10" class="p-4 text-center text-slate-400 font-sans">Loading benchmark history...</td>
                 </tr>
@@ -2411,7 +2505,7 @@
         document.getElementById('sidebarStatusText').innerText = 'STREAMING';
         document.getElementById('sidebarStatusDot').style.backgroundColor = '#10B981';
         document.getElementById('overviewPipelineState').innerText = 'STREAMING';
-        document.getElementById('overviewPipelineState').className = 'text-lg font-black text-emerald-400 font-mono animate-pulse';
+        document.getElementById('overviewPipelineState').className = 'text-2xl font-black text-emerald-600 dark:text-emerald-400 font-mono tracking-tight animate-pulse';
         document.getElementById('navLivePulseDot').className = 'w-2 h-2 rounded-full bg-emerald-400 animate-pulse';
         stopBtn.disabled = false;
 
@@ -2467,7 +2561,7 @@
         document.getElementById('sidebarStatusText').innerText = 'STOPPED';
         document.getElementById('sidebarStatusDot').style.backgroundColor = '#EF4444';
         document.getElementById('overviewPipelineState').innerText = 'STOPPED';
-        document.getElementById('overviewPipelineState').className = 'text-lg font-black text-slate-400 font-mono';
+        document.getElementById('overviewPipelineState').className = 'text-2xl font-black text-slate-500 dark:text-slate-400 font-mono tracking-tight';
         document.getElementById('navLivePulseDot').className = 'w-2 h-2 rounded-full bg-slate-600';
         startBtn.disabled = false;
       }
@@ -2578,7 +2672,7 @@
         document.getElementById('sidebarStatusText').innerText = 'FINISHED';
         document.getElementById('sidebarStatusDot').style.backgroundColor = '#3B82F6';
         document.getElementById('overviewPipelineState').innerText = 'FINISHED';
-        document.getElementById('overviewPipelineState').className = 'text-lg font-black text-blue-400 font-mono';
+        document.getElementById('overviewPipelineState').className = 'text-2xl font-black text-blue-600 dark:text-blue-400 font-mono tracking-tight';
         document.getElementById('navLivePulseDot').className = 'w-2 h-2 rounded-full bg-slate-600';
         document.getElementById('startStreamBtn').disabled = false;
         document.getElementById('stopStreamBtn').disabled = true;
@@ -2780,22 +2874,29 @@
           data.slice().reverse().forEach(row => {
             const isTCP = row.protocol === 'TCP';
             const protoBadge = isTCP
-              ? '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-700 border border-blue-200">TCP</span>'
-              : '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700 border border-rose-200">UDP</span>';
+              ? '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400 border border-blue-200 dark:border-blue-500/30">TCP</span>'
+              : '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-400 border border-rose-200 dark:border-rose-500/30">UDP</span>';
+
+            const bwText = Number(row.bandwidth_mbps) > 0 ? (Number(row.bandwidth_mbps).toFixed(1) + ' Mbps') : 'Uncapped';
+            const tput = typeof row.throughput_mbps === 'number' ? row.throughput_mbps.toFixed(2) : (row.throughput_mbps || '-');
+            const delay = typeof row.latency_mean_ms === 'number' ? row.latency_mean_ms.toFixed(2) : (row.latency_mean_ms || '-');
+            const jitter = typeof row.rfc3550_jitter_ms === 'number' ? row.rfc3550_jitter_ms.toFixed(2) : (row.rfc3550_jitter_ms || '-');
+            const deliv = typeof row.frame_delivery_ratio_percent === 'number' ? row.frame_delivery_ratio_percent.toFixed(1) : (row.frame_delivery_ratio_percent || '-');
+            const stallSec = typeof row.total_stall_seconds === 'number' ? row.total_stall_seconds.toFixed(2) : (row.total_stall_seconds || '0.00');
 
             const tr = document.createElement('tr');
             tr.className = 'hover:bg-slate-50 dark:hover:bg-[#162132] transition';
             tr.innerHTML = `
-              <td class="p-3 text-slate-900 dark:text-slate-100 font-semibold">${row.scenario_name || row.scenario_id}</td>
-              <td class="p-3">${protoBadge}</td>
-              <td class="p-3 text-slate-600 dark:text-slate-300">${row.latency_ms}</td>
-              <td class="p-3 text-slate-600 dark:text-slate-300">${row.loss_percent}%</td>
-              <td class="p-3 text-slate-600 dark:text-slate-300">${row.bandwidth_mbps > 0 ? row.bandwidth_mbps + ' Mbps' : 'Uncapped'}</td>
-              <td class="p-3 text-slate-900 dark:text-slate-100 font-bold">${row.throughput_mbps}</td>
-              <td class="p-3 text-slate-600 dark:text-slate-300">${row.latency_mean_ms} ms</td>
-              <td class="p-3 text-slate-600 dark:text-slate-300">${row.rfc3550_jitter_ms} ms</td>
-              <td class="p-3 text-emerald-600 dark:text-emerald-400 font-semibold">${row.frame_delivery_ratio_percent}%</td>
-              <td class="p-3 text-slate-600 dark:text-slate-300">${row.rebuffering_events} (${row.total_stall_seconds}s)</td>
+              <td class="text-left font-sans font-semibold text-slate-900 dark:text-slate-100">${row.scenario_name || row.scenario_id}</td>
+              <td class="text-center font-sans">${protoBadge}</td>
+              <td class="text-right text-slate-700 dark:text-slate-300">${row.latency_ms} ms</td>
+              <td class="text-right text-slate-700 dark:text-slate-300">${row.loss_percent}%</td>
+              <td class="text-right text-slate-700 dark:text-slate-300">${bwText}</td>
+              <td class="text-right text-slate-900 dark:text-slate-100 font-bold">${tput} Mbps</td>
+              <td class="text-right text-slate-700 dark:text-slate-300">${delay} ms</td>
+              <td class="text-right text-slate-700 dark:text-slate-300">${jitter} ms</td>
+              <td class="text-right text-emerald-700 dark:text-emerald-400 font-bold">${deliv}%</td>
+              <td class="text-right text-slate-700 dark:text-slate-300">${row.rebuffering_events || 0} (${stallSec}s)</td>
             `;
             tbody.appendChild(tr);
           });
